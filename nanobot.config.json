@@ -1,0 +1,38 @@
+{
+	"providers": {
+		"openrouter": {
+			"baseUrl": "https://openrouter.ai/api/v1",
+			"apiKey": ""
+		},
+		"openai": {
+			"baseUrl": "https://api.openai.com/v1",
+			"apiKey": ""
+		},
+		"moonshot": {
+			"baseUrl": "https://api.moonshot.cn/v1",
+			"apiKey": ""
+		}
+	},
+	"agents": {
+		"defaults": {
+			"model": "kimi-k2.5",
+			"provider": "moonshot"
+		}
+	},
+	"tools": {
+		"allowShell": true,
+		"workspaceRoot": "D:\\Project\\nanobot"
+	},
+	"channels": {
+		"weixin": {
+			"enabled": true,
+			"allow_from": [],
+			"base_url": "https://ilinkai.weixin.qq.com",
+			"cdn_base_url": "https://novac2c.cdn.weixin.qq.com/c2c",
+			"route_tag": null,
+			"token": "",
+			"state_dir": "",
+			"poll_timeout": 35
+		}
+	}
+}
