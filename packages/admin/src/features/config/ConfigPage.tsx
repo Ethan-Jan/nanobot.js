@@ -8,45 +8,25 @@ import {
   Switch,
   message,
   Space,
-  Spin,
   Typography,
 } from "antd";
-import { getConfig, putConfig } from "../api";
-import type { NanobotConfigDTO } from "../types";
+import { getConfig, putConfig } from "@/shared/api";
+import type { NanobotConfigDTO } from "@/shared/types";
+import { PageSpinner } from "@/shared/ui/PageSpinner";
+import { configToFormValues, formValuesToPatch, type ConfigFormValues } from "./configForm";
 
-export default function ConfigPage() {
+export function ConfigPage() {
   const [cfg, setCfg] = useState<NanobotConfigDTO | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [form] = Form.useForm<{
-    tools: NanobotConfigDTO["tools"];
-    memory: NonNullable<NanobotConfigDTO["agents"]["memory"]>;
-    persona: { displayName?: string; askNicknameOnStart?: boolean };
-    weixin: NonNullable<NanobotConfigDTO["channels"]>["weixin"];
-  }>();
+  const [form] = Form.useForm<ConfigFormValues>();
 
   const load = async () => {
     setLoading(true);
     try {
       const c = await getConfig();
       setCfg(c);
-      const wx = { ...(c.channels?.weixin ?? {}), token: "" };
-      form.setFieldsValue({
-        tools: {
-          allowShell: c.tools.allowShell,
-          allowWrite: c.tools.allowWrite ?? true,
-          workspaceRoot: c.tools.workspaceRoot,
-        },
-        memory: {
-          enabled: c.agents.memory?.enabled ?? true,
-          maxPersistedMessages: c.agents.memory?.maxPersistedMessages ?? 40,
-        },
-        persona: {
-          displayName: c.agents.displayName ?? "",
-          askNicknameOnStart: c.agents.askNicknameOnStart ?? false,
-        },
-        weixin: wx,
-      });
+      form.setFieldsValue(configToFormValues(c));
     } catch (e) {
       message.error(e instanceof Error ? e.message : String(e));
     } finally {
@@ -58,56 +38,14 @@ export default function ConfigPage() {
     void load();
   }, []);
 
-  const onFinish = async (values: {
-    tools: NanobotConfigDTO["tools"];
-    memory: NonNullable<NanobotConfigDTO["agents"]["memory"]>;
-    persona: { displayName?: string; askNicknameOnStart?: boolean };
-    weixin: NonNullable<NanobotConfigDTO["channels"]>["weixin"];
-  }) => {
+  const onFinish = async (values: ConfigFormValues) => {
     if (!cfg) return;
     setSaving(true);
     try {
-      const weixinPatch: Record<string, unknown> = { ...values.weixin };
-      const t = typeof values.weixin?.token === "string" ? values.weixin.token.trim() : "";
-      if (t) weixinPatch.token = t;
-      else delete weixinPatch.token;
-
-      const dn = typeof values.persona?.displayName === "string" ? values.persona.displayName.trim() : "";
-      const patch = {
-        tools: values.tools,
-        agents: {
-          memory: {
-            enabled: values.memory.enabled,
-            maxPersistedMessages: values.memory.maxPersistedMessages,
-          },
-          displayName: dn,
-          askNicknameOnStart: Boolean(values.persona?.askNicknameOnStart),
-        },
-        channels: {
-          weixin: weixinPatch,
-        },
-      };
-
-      const updated = await putConfig(patch);
+      const updated = await putConfig(formValuesToPatch(values));
       setCfg(updated);
       message.success("已保存");
-      const weixinFields = { ...(updated.channels?.weixin ?? {}), token: "" };
-      form.setFieldsValue({
-        tools: {
-          allowShell: updated.tools.allowShell,
-          allowWrite: updated.tools.allowWrite ?? true,
-          workspaceRoot: updated.tools.workspaceRoot,
-        },
-        memory: {
-          enabled: updated.agents.memory?.enabled ?? true,
-          maxPersistedMessages: updated.agents.memory?.maxPersistedMessages ?? 40,
-        },
-        persona: {
-          displayName: updated.agents.displayName ?? "",
-          askNicknameOnStart: updated.agents.askNicknameOnStart ?? false,
-        },
-        weixin: weixinFields,
-      });
+      form.setFieldsValue(configToFormValues(updated));
     } catch (e) {
       message.error(e instanceof Error ? e.message : String(e));
     } finally {
@@ -116,11 +54,7 @@ export default function ConfigPage() {
   };
 
   if (loading || !cfg) {
-    return (
-      <div style={{ textAlign: "center", padding: 48 }}>
-        <Spin size="large" />
-      </div>
-    );
+    return <PageSpinner />;
   }
 
   return (
