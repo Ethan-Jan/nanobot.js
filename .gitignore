@@ -1,3 +1,4 @@
+.nanobot-runtime
 node_modules
 dist
 dist-server
