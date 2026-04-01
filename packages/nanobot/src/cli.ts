@@ -12,7 +12,15 @@ program.name("nanobot").description("nanobot TypeScript port（对齐 HKUDS/nano
 
 registerNanobotCli(program);
 
-program.parseAsync(process.argv).catch((err) => {
+/** `pnpm run start -- subcmd` 有时会把字面量 `--` 放进 argv，commander 会误解析 */
+function argvForCommander(): string[] {
+  const a = [...process.argv];
+  const i = a.findIndex((x, idx) => idx >= 2 && x === "--");
+  if (i >= 2) a.splice(i, 1);
+  return a;
+}
+
+program.parseAsync(argvForCommander()).catch((err) => {
   console.error(err instanceof Error ? err.message : err);
   process.exitCode = 1;
 });

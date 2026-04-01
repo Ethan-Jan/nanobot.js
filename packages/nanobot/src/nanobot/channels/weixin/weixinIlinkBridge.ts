@@ -7,7 +7,7 @@
 
 import { randomUUID } from "node:crypto";
 import QRCode from "qrcode";
-import { defaultConfig, type NanobotConfig, type WeixinChannelConfig } from "../../../config.js";
+import { type NanobotConfig } from "../../../config.js";
 import { runAgentMessage } from "../../../agent.js";
 import {
   loadAccountState,
@@ -28,31 +28,15 @@ import {
   MAX_QR_REFRESH,
 } from "./constants.js";
 import { buildHeaders, ilinkGet, ilinkPost } from "./ilinkHttp.js";
+import { mergedWeixinConfig, type MergedWeixinChannelConfig } from "./weixinMerge.js";
+
+export type { MergedWeixinChannelConfig };
+export { mergedWeixinConfig } from "./weixinMerge.js";
 
 /** 轮询错误、收消息等详细日志；默认关闭，仅启动时一条 channel 状态 */
 function weixinVerbose(): boolean {
   const v = process.env.NANOBOT_WEIXIN_VERBOSE?.trim();
   return v === "1" || /^true$/i.test(v ?? "");
-}
-
-function mergedWeixin(cfg: NanobotConfig): Required<
-  Pick<
-    WeixinChannelConfig,
-    "base_url" | "cdn_base_url" | "poll_timeout" | "allow_from" | "token" | "state_dir" | "enabled"
-  >
-> & { route_tag: string | number | null } {
-  const d = defaultConfig().channels!.weixin!;
-  const w = cfg.channels?.weixin ?? {};
-  return {
-    enabled: w.enabled ?? d.enabled ?? false,
-    allow_from: w.allow_from ?? d.allow_from ?? [],
-    base_url: w.base_url ?? d.base_url!,
-    cdn_base_url: w.cdn_base_url ?? d.cdn_base_url!,
-    route_tag: w.route_tag ?? d.route_tag ?? null,
-    token: w.token ?? d.token ?? "",
-    state_dir: w.state_dir ?? d.state_dir ?? "",
-    poll_timeout: w.poll_timeout ?? d.poll_timeout ?? DEFAULT_LONG_POLL_TIMEOUT_S,
-  };
 }
 
 function splitMessage(text: string, maxLen: number): string[] {
@@ -65,7 +49,7 @@ function splitMessage(text: string, maxLen: number): string[] {
 }
 
 export class WeixinIlinkBridge {
-  private readonly wx: ReturnType<typeof mergedWeixin>;
+  private readonly wx: MergedWeixinChannelConfig;
   private readonly stateDir: string;
   private token = "";
   private getUpdatesBuf = "";
@@ -79,7 +63,7 @@ export class WeixinIlinkBridge {
   private agentAllowShell = false;
 
   constructor(private readonly appConfig: NanobotConfig) {
-    this.wx = mergedWeixin(appConfig);
+    this.wx = mergedWeixinConfig(appConfig);
     this.stateDir = defaultStateDir(this.wx);
     this.baseUrl = this.wx.base_url;
   }
@@ -277,16 +261,23 @@ export class WeixinIlinkBridge {
     }
   }
 
-  private async handleInboundText(fromUserId: string, text: string): Promise<void> {
+  private async handleInboundText(
+    fromUserId: string,
+    text: string,
+    contextFromThisMessage?: string,
+  ): Promise<void> {
     const allow = this.wx.allow_from;
     if (allow.length > 0 && !allow.includes(fromUserId)) {
-      if (weixinVerbose()) console.log(`[weixin] 忽略来自 ${fromUserId} 的消息（不在 allow_from）`);
+      console.warn(`[weixin] 已忽略来自 ${fromUserId} 的消息（不在 channels.weixin.allow_from 白名单）`);
       return;
     }
 
-    const ctx = this.contextTokens[fromUserId];
+    const ctx =
+      (contextFromThisMessage?.trim() || this.contextTokens[fromUserId] || "").trim() || undefined;
     if (!ctx) {
-      if (weixinVerbose()) console.error(`[weixin] 缺少 context_token，无法回复 ${fromUserId}`);
+      console.warn(
+        `[weixin] 缺少 context_token，无法回复 from=${fromUserId}。调试请设 NANOBOT_WEIXIN_VERBOSE=1。`,
+      );
       return;
     }
 
@@ -315,7 +306,7 @@ export class WeixinIlinkBridge {
     if (!this.rememberProcessed(idKey)) return;
     if (!fromUser) return;
 
-    const ctxTok = String(msg.context_token ?? "");
+    const ctxTok = String(msg.context_token ?? "").trim();
     if (ctxTok) {
       this.contextTokens[fromUser] = ctxTok;
       await this.persist();
@@ -324,7 +315,7 @@ export class WeixinIlinkBridge {
     const content = this.extractTextContent(msg);
     if (!content) return;
 
-    await this.handleInboundText(fromUser, content);
+    await this.handleInboundText(fromUser, content, ctxTok || undefined);
   }
 
   private async pollOnce(): Promise<void> {

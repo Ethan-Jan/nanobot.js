@@ -19,4 +19,17 @@ declare module "nanobot/api-lib" {
     userMessage: string,
     opts?: { sessionKey?: string; allowShell?: boolean },
   ): Promise<string>;
+
+  export function weixinHasPersistedToken(cfg: NanobotConfig): Promise<boolean>;
+  export function startWeixinQrSession(
+    cfg: NanobotConfig,
+    opts?: { force?: boolean },
+  ): Promise<{ qrcode: string; scanPayload: string; qrDataUrl: string }>;
+  export function pollWeixinQrAndMaybeSave(
+    cfg: NanobotConfig,
+    qrcodeId: string,
+  ): Promise<
+    | { status: "waiting" | "scaned" | "expired" }
+    | { status: "confirmed"; saved: true }
+  >;
 }

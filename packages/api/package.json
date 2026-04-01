@@ -7,7 +7,7 @@
     "prebuild": "pnpm --filter nanobot run build:lib",
     "build": "nest build",
     "start": "node dist/main.js",
-    "start:dev": "pnpm --filter nanobot run build:lib && nest build && concurrently -k -n lib,build,serve \"pnpm --filter nanobot run build:lib:watch\" \"nest build --watch\" \"wait-on dist/main.js && nodemon\"",
+    "start:dev": "pnpm --filter nanobot run build:lib && nest build && concurrently -k -n lib,build,serve \"pnpm --filter nanobot run build:lib:watch\" \"nest build --watch\" \"wait-on dist/main.js && cross-env NANOBOT_API_DEV=1 nodemon\"",
     "start:debug": "nest start --debug --watch",
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
@@ -26,6 +26,7 @@
     "@types/express": "^5.0.0",
     "@types/node": "^22.10.0",
     "concurrently": "^9.1.0",
+    "cross-env": "^7.0.3",
     "nodemon": "^3.1.9",
     "typescript": "^5.7.0",
     "wait-on": "^8.0.1"

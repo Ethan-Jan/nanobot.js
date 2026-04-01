@@ -8,15 +8,20 @@
     "build": "pnpm -r run build",
     "dev": "pnpm --filter @nanobot/admin dev",
     "dev:admin": "pnpm --filter @nanobot/admin dev",
+    "dev:all": "concurrently -n admin,weixin -c cyan,magenta \"pnpm dev:admin\" \"node scripts/weixin-retry.mjs\"",
     "dev:api": "pnpm --filter @nanobot/api start:dev",
     "dev:cli": "pnpm --filter nanobot dev",
     "start:admin": "pnpm --filter @nanobot/api start",
     "start:api": "pnpm --filter @nanobot/api start",
+    "start:all": "concurrently -n api,weixin -c blue,magenta \"pnpm --filter @nanobot/api start\" \"node scripts/weixin-retry.mjs\"",
     "nanobot": "pnpm --filter nanobot start",
     "typecheck": "pnpm -r run typecheck"
   },
   "engines": {
     "node": ">=20"
   },
-  "packageManager": "pnpm@9.15.0"
+  "packageManager": "pnpm@9.15.0",
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  }
 }

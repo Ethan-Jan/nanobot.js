@@ -17,6 +17,8 @@ export default defineConfig({
     sourcemap: true,
   },
   server: {
+    // 避免仅监听 IPv6 ::1 时，用 http://127.0.0.1:5173 会连不上；需要局域网访问时用 Network 地址
+    host: true,
     port: 5173,
     proxy: {
       "/api": { target: "http://127.0.0.1:18791", changeOrigin: true },

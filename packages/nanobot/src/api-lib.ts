@@ -3,3 +3,10 @@
  */
 export { configPath, loadConfig, mergeAndSave, type NanobotConfig } from "./config.js";
 export { runAgentWithHistory, type AgentChatHistoryItem } from "./agent.js";
+export {
+  weixinHasPersistedToken,
+  startWeixinQrSession,
+  pollWeixinQrAndMaybeSave,
+  type WeixinQrStartResult,
+  type WeixinQrPollResult,
+} from "./nanobot/channels/weixin/weixinQrLogin.js";
