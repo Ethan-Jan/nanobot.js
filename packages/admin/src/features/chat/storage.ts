@@ -1,4 +1,3 @@
-import { message } from "antd";
 import type { ChatTurn } from "@/shared/api";
 import type { ChatThread } from "./types";
 
@@ -45,11 +44,13 @@ export function loadThreadsFromStorage(): ChatThread[] {
   }
 }
 
-export function saveThreadsToStorage(threads: ChatThread[]) {
+/** @returns 是否写入成功（失败时仅打日志，由调用方决定是否 toast） */
+export function saveThreadsToStorage(threads: ChatThread[]): boolean {
   try {
     localStorage.setItem(CHAT_THREADS_STORAGE_KEY, JSON.stringify(threads));
+    return true;
   } catch (e) {
-    message.warning("无法写入本地存储，刷新后历史可能丢失。");
     console.error(e);
+    return false;
   }
 }

@@ -69,7 +69,7 @@ export function ChatMessagePanel({
         ))}
         {loading ? (
           <div style={{ textAlign: "center", padding: 16 }}>
-            <Spin tip="模型思考中…" />
+            <Spin size="medium" tip="模型思考中…" />
           </div>
         ) : null}
         <div ref={listEndRef} />

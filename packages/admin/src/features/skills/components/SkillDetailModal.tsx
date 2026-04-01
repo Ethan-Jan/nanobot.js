@@ -24,7 +24,7 @@ export function SkillDetailModal({ open, loading, skill, onClose }: Props) {
     >
       {loading ? (
         <div style={{ textAlign: "center", padding: 48 }}>
-          <Spin />
+          <Spin size="medium" />
         </div>
       ) : skill ? (
         <Descriptions column={1} bordered size="small">

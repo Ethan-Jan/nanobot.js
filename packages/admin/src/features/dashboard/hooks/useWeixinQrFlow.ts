@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Modal, message } from "antd";
+import { App } from "antd";
 import { getWeixinLoginPoll, postWeixinLoginQr, type WeixinQrStartResponse } from "@/shared/api";
 import { MSG_KEY_WEIXIN_QR } from "../constants";
 
@@ -8,6 +8,10 @@ type Options = {
 };
 
 export function useWeixinQrFlow({ onLoginConfirmed }: Options) {
+  const { message, modal } = App.useApp();
+  const messageRef = useRef(message);
+  messageRef.current = message;
+
   const [qrOpen, setQrOpen] = useState(false);
   const [qrSession, setQrSession] = useState<WeixinQrStartResponse | null>(null);
   const [qrHint, setQrHint] = useState("请使用微信扫描下方二维码");
@@ -28,7 +32,7 @@ export function useWeixinQrFlow({ onLoginConfirmed }: Options) {
       return;
     }
     pollHandledRef.current = false;
-    message.destroy(MSG_KEY_WEIXIN_QR);
+    messageRef.current.destroy(MSG_KEY_WEIXIN_QR);
 
     const tick = () => {
       if (pollHandledRef.current) return;
@@ -45,7 +49,7 @@ export function useWeixinQrFlow({ onLoginConfirmed }: Options) {
           if (s.status === "expired") {
             pollHandledRef.current = true;
             stopPoll();
-            message.warning({
+            messageRef.current.warning({
               content: "二维码已过期，请关闭后重新获取",
               key: MSG_KEY_WEIXIN_QR,
             });
@@ -54,7 +58,7 @@ export function useWeixinQrFlow({ onLoginConfirmed }: Options) {
           if (s.status === "confirmed") {
             pollHandledRef.current = true;
             stopPoll();
-            message.success({
+            messageRef.current.success({
               content: "已关联微信，token 已写入本机 .nanobot-runtime/weixin/account.json",
               key: MSG_KEY_WEIXIN_QR,
             });
@@ -66,7 +70,7 @@ export function useWeixinQrFlow({ onLoginConfirmed }: Options) {
           if (pollHandledRef.current) return;
           pollHandledRef.current = true;
           stopPoll();
-          message.error({
+          messageRef.current.error({
             content: e instanceof Error ? e.message : String(e),
             key: MSG_KEY_WEIXIN_QR,
           });
@@ -97,7 +101,7 @@ export function useWeixinQrFlow({ onLoginConfirmed }: Options) {
     } catch (e) {
       const errObj = e as Error & { status?: number };
       if (errObj.status === 409) {
-        Modal.confirm({
+        modal.confirm({
           title: "已有登录态",
           content: "将删除本机 account.json 并重新扫码，是否继续？",
           okText: "重新扫码",

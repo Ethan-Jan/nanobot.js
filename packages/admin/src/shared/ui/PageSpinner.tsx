@@ -1,7 +1,7 @@
 import { Spin } from "antd";
 
 type Props = {
-  size?: "small" | "default" | "large";
+  size?: "small" | "medium" | "large";
   tip?: string;
 };
 

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { message } from "antd";
+import { App } from "antd";
 import { postChat, type ChatTurn } from "@/shared/api";
 import {
   deriveThreadTitle,
@@ -10,6 +10,10 @@ import {
 import type { ChatThread } from "../types";
 
 export function useChatWorkspace() {
+  const { message } = App.useApp();
+  const messageRef = useRef(message);
+  messageRef.current = message;
+
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
@@ -22,7 +26,9 @@ export function useChatWorkspace() {
     if (list.length === 0) {
       const id = newThreadId();
       list = [{ id, title: "新对话", updatedAt: Date.now(), turns: [] }];
-      saveThreadsToStorage(list);
+      if (!saveThreadsToStorage(list)) {
+        messageRef.current.warning("无法写入本地存储，刷新后历史可能丢失。");
+      }
     }
     setThreads(list);
     setActiveId(list[0]!.id);
@@ -31,7 +37,9 @@ export function useChatWorkspace() {
 
   useEffect(() => {
     if (!hydrated) return;
-    saveThreadsToStorage(threads);
+    if (!saveThreadsToStorage(threads)) {
+      messageRef.current.warning("无法写入本地存储，刷新后历史可能丢失。");
+    }
   }, [threads, hydrated]);
 
   useEffect(() => {
@@ -130,7 +138,7 @@ export function useChatWorkspace() {
     } finally {
       setLoading(false);
     }
-  }, [draft, loading, activeId, active, turns, updateActiveThread]);
+  }, [draft, loading, activeId, active, turns, updateActiveThread, message]);
 
   const sortedThreads = useMemo(
     () => [...threads].sort((a, b) => b.updatedAt - a.updatedAt),

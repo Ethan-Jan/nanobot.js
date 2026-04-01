@@ -1,12 +1,12 @@
 import { useEffect, useState } from "react";
 import {
+  App,
   Button,
   Card,
   Form,
   Input,
   InputNumber,
   Switch,
-  message,
   Space,
   Typography,
 } from "antd";
@@ -16,6 +16,7 @@ import { PageSpinner } from "@/shared/ui/PageSpinner";
 import { configToFormValues, formValuesToPatch, type ConfigFormValues } from "./configForm";
 
 export function ConfigPage() {
+  const { message } = App.useApp();
   const [cfg, setCfg] = useState<NanobotConfigDTO | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Button, Card, Form, Input, message, Space, Typography } from "antd";
+import { App, Button, Card, Form, Input, Space, Typography } from "antd";
 import { getConfig, putConfig } from "@/shared/api";
 import type { NanobotConfigDTO } from "@/shared/types";
 import { PageSpinner } from "@/shared/ui/PageSpinner";
@@ -11,6 +11,7 @@ import {
 } from "./providersSubmit";
 
 export function ProvidersPage() {
+  const { message } = App.useApp();
   const [cfg, setCfg] = useState<NanobotConfigDTO | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);

@@ -1,7 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
-import { ConfigProvider, theme } from "antd";
+import { App as AntdApp, ConfigProvider, theme } from "antd";
 import type { Locale } from "antd/es/locale";
 import * as ZhLocale from "antd/locale/zh_CN";
 import App from "@/app/App";
@@ -13,7 +13,9 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <BrowserRouter>
       <ConfigProvider locale={zhCN} theme={{ algorithm: theme.defaultAlgorithm }}>
-        <App />
+        <AntdApp>
+          <App />
+        </AntdApp>
       </ConfigProvider>
     </BrowserRouter>
   </StrictMode>,

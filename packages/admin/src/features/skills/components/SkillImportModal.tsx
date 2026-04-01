@@ -1,6 +1,8 @@
-import { Alert, Button, Input, List, Modal, Space, Switch, Tag, Typography } from "antd";
+import { Alert, Button, Flex, Input, Modal, Space, Switch, Tag, Typography } from "antd";
 import { DownloadOutlined, GithubOutlined } from "@ant-design/icons";
 import type { GitHubSkillInfo } from "@/shared/types";
+
+const BORDER = "1px solid var(--ant-color-border-secondary, #f0f0f0)";
 
 type Props = {
   open: boolean;
@@ -35,7 +37,7 @@ export function SkillImportModal({
 }: Props) {
   return (
     <Modal title="从 GitHub 导入技能" open={open} onCancel={onClose} footer={null} width={700}>
-      <Space direction="vertical" style={{ width: "100%" }} size="large">
+      <Space orientation="vertical" style={{ width: "100%" }} size="large">
         <div>
           <Typography.Text strong>直接导入</Typography.Text>
           <Typography.Paragraph type="secondary" style={{ marginTop: 8 }}>
@@ -85,39 +87,49 @@ export function SkillImportModal({
           </Space.Compact>
 
           {searchResults.length > 0 && (
-            <List
-              style={{ marginTop: 16 }}
-              size="small"
-              bordered
-              dataSource={searchResults}
-              renderItem={(item) => (
-                <List.Item
-                  actions={[
-                    <Button
-                      key="import"
-                      type="link"
-                      size="small"
-                      icon={<DownloadOutlined />}
-                      onClick={() => onImport(item.url)}
-                    >
-                      导入
-                    </Button>,
-                  ]}
+            <div
+              style={{
+                marginTop: 16,
+                border: BORDER,
+                borderRadius: 8,
+                overflow: "hidden",
+              }}
+            >
+              {searchResults.map((item, i) => (
+                <Flex
+                  key={`${item.fullName}-${i}`}
+                  align="flex-start"
+                  justify="space-between"
+                  gap={12}
+                  style={{
+                    padding: "8px 12px",
+                    borderTop: i > 0 ? BORDER : undefined,
+                  }}
                 >
-                  <List.Item.Meta
-                    title={
-                      <Space>
-                        <Typography.Link href={item.url} target="_blank">
-                          {item.fullName}
-                        </Typography.Link>
-                        <Tag>★ {item.stars}</Tag>
-                      </Space>
-                    }
-                    description={item.description}
-                  />
-                </List.Item>
-              )}
-            />
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <Space wrap>
+                      <Typography.Link href={item.url} target="_blank">
+                        {item.fullName}
+                      </Typography.Link>
+                      <Tag>★ {item.stars}</Tag>
+                    </Space>
+                    {item.description ? (
+                      <Typography.Paragraph type="secondary" style={{ margin: "4px 0 0" }}>
+                        {item.description}
+                      </Typography.Paragraph>
+                    ) : null}
+                  </div>
+                  <Button
+                    type="link"
+                    size="small"
+                    icon={<DownloadOutlined />}
+                    onClick={() => onImport(item.url)}
+                  >
+                    导入
+                  </Button>
+                </Flex>
+              ))}
+            </div>
           )}
         </div>
 

@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { message } from "antd";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { App } from "antd";
 import {
   deleteSkill,
   getSkillDetail,
@@ -11,6 +11,10 @@ import {
 import type { GitHubSkillInfo, SkillManifest } from "@/shared/types";
 
 export function useSkillsAdmin() {
+  const { message } = App.useApp();
+  const messageRef = useRef(message);
+  messageRef.current = message;
+
   const [skills, setSkills] = useState<SkillManifest[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -59,7 +63,7 @@ export function useSkillsAdmin() {
       const detail = await getSkillDetail(name);
       setDetailSkill(detail);
     } catch (e) {
-      message.error(e instanceof Error ? e.message : "获取详情失败");
+      messageRef.current.error(e instanceof Error ? e.message : "获取详情失败");
       setDetailOpen(false);
     } finally {
       setDetailLoading(false);
@@ -75,17 +79,17 @@ export function useSkillsAdmin() {
     async (urlOverride?: string) => {
       const u = (urlOverride ?? githubUrl).trim();
       if (!u) {
-        message.warning("请输入 GitHub 仓库地址");
+        messageRef.current.warning("请输入 GitHub 仓库地址");
         return;
       }
       setImporting(true);
       try {
         await importSkillFromGitHub(u);
-        message.success("技能导入成功");
+        messageRef.current.success("技能导入成功");
         closeImportModal();
         void loadSkills();
       } catch (e) {
-        message.error(e instanceof Error ? e.message : "导入失败");
+        messageRef.current.error(e instanceof Error ? e.message : "导入失败");
       } finally {
         setImporting(false);
       }
@@ -97,10 +101,10 @@ export function useSkillsAdmin() {
     async (name: string) => {
       try {
         await deleteSkill(name);
-        message.success(`已删除技能: ${name}`);
+        messageRef.current.success(`已删除技能: ${name}`);
         void loadSkills();
       } catch (e) {
-        message.error(e instanceof Error ? e.message : "删除失败");
+        messageRef.current.error(e instanceof Error ? e.message : "删除失败");
       }
     },
     [loadSkills],
@@ -109,10 +113,10 @@ export function useSkillsAdmin() {
   const reload = useCallback(async () => {
     try {
       await reloadSkills();
-      message.success("技能已重新加载");
+      messageRef.current.success("技能已重新加载");
       void loadSkills();
     } catch (e) {
-      message.error(e instanceof Error ? e.message : "重载失败");
+      messageRef.current.error(e instanceof Error ? e.message : "重载失败");
     }
   }, [loadSkills]);
 
@@ -123,10 +127,10 @@ export function useSkillsAdmin() {
       const results = await searchGitHubSkills(searchQuery.trim(), broadGitHubSearch);
       setSearchResults(results);
       if (results.length === 0) {
-        message.info("无结果，可尝试开启「扩大搜索」或换关键词");
+        messageRef.current.info("无结果，可尝试开启「扩大搜索」或换关键词");
       }
     } catch (e) {
-      message.error(e instanceof Error ? e.message : "搜索失败");
+      messageRef.current.error(e instanceof Error ? e.message : "搜索失败");
     } finally {
       setSearching(false);
     }

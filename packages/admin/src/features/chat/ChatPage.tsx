@@ -22,7 +22,7 @@ export function ChatPage() {
   } = useChatWorkspace();
 
   if (!hydrated || !activeId) {
-    return <PageSpinner size="default" />;
+    return <PageSpinner size="medium" />;
   }
 
   return (
