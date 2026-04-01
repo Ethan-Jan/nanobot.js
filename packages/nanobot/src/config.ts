@@ -1,3 +1,4 @@
+import { existsSync } from "node:fs";
 import { mkdir, readdir, readFile, rmdir, unlink, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -68,8 +69,18 @@ export interface NanobotConfig {
 const DEFAULT_MODEL = "kimi-k2.5";
 const DEFAULT_PROVIDER: ProviderName = "moonshot";
 
-/** 含 package.json / dist 的工程根（与 dist/cli.js 或 src 的位置相对） */
+/**
+ * 工程根：自本文件位置向上查找首个包含 `nanobot.config.json` 的目录；
+ * 找不到则回退为 nanobot 包根目录（`src` 的上一级），便于 monorepo 根配置一份文件。
+ */
 export function repoRoot(): string {
+  let cur = dirname(fileURLToPath(import.meta.url));
+  for (let i = 0; i < 14; i++) {
+    if (existsSync(join(cur, "nanobot.config.json"))) return cur;
+    const parent = dirname(cur);
+    if (parent === cur) break;
+    cur = parent;
+  }
   return join(dirname(fileURLToPath(import.meta.url)), "..");
 }
 

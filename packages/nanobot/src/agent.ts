@@ -177,6 +177,52 @@ export async function runAgentMessage(
   return out.trim() || "(empty reply)";
 }
 
+export type AgentChatHistoryItem = { role: "user" | "assistant"; content: string };
+
+/**
+ * 多轮对话（无 REPL）：`prior` 为不含 system 的 user/assistant 消息；`userMessage` 为本轮用户输入。
+ * 与 `runAgentMessage` 相同工具与记忆策略；`sessionKey` 默认 `admin:web` 可与 CLI 会话隔离。
+ */
+export async function runAgentWithHistory(
+  cfg: NanobotConfig,
+  prior: AgentChatHistoryItem[],
+  userMessage: string,
+  opts?: AgentRunOptions,
+): Promise<string> {
+  const { client, providerName, baseURL } = createClient(cfg);
+  const model = effectiveChatModel(cfg, providerName);
+  const policy: ToolPolicy = {
+    allowShell: opts?.allowShell ?? cfg.tools.allowShell,
+    allowWrite: cfg.tools.allowWrite !== false,
+    workspaceRoot: resolveWorkspace(cfg, opts),
+  };
+  const tools = toolDefinitions(policy.allowShell ?? false, policy.allowWrite !== false);
+  const sessionKey = opts?.sessionKey ?? "admin:web";
+  const systemContent = await buildFullSystemPrompt(SYSTEM, cfg, policy.workspaceRoot ?? process.cwd(), sessionKey);
+  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
+    { role: "system", content: systemContent },
+    ...prior.map((m) => ({ role: m.role, content: m.content })),
+    { role: "user", content: userMessage },
+  ];
+  let out = "";
+  await runModelToolRounds(
+    client,
+    model,
+    messages,
+    tools,
+    policy,
+    (t) => {
+      out += t;
+    },
+    { providerName, baseURL },
+  );
+  const replyText = lastAssistantPlainText(messages);
+  if (isMemoryEnabled(cfg) && replyText) {
+    await appendSessionTranscript(sessionKey, userMessage, replyText, memoryPersistLimit(cfg));
+  }
+  return out.trim() || "(empty reply)";
+}
+
 export async function runAgentLoop(cfg: NanobotConfig, opts?: AgentRunOptions): Promise<void> {
   const { client, providerName, baseURL } = createClient(cfg);
   const model = effectiveChatModel(cfg, providerName);
