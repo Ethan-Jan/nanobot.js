@@ -1,8 +1,27 @@
 # nanobot (TypeScript)
 
-基于 **OpenAI 兼容 API** 的轻量本地 AI 助手 **CLI**，结构对齐 **[HKUDS/nanobot](https://github.com/HKUDS/nanobot)**（Python 原版），使用 **TypeScript + Node 20+** 实现。本仓库为 **pnpm monorepo**：核心 CLI 在 `packages/nanobot`，**B 端控制台**（Ant Design + React 19 + React Compiler）在 `packages/admin`。适合在终端对话、读写工作区文件、以及通过 **微信 iLink** 做个人号文本机器人（部分能力）。
+基于 **OpenAI 兼容 API** 的轻量本地 AI 助手：**终端 CLI** + **可选 Web 管理台** + **微信 iLink 文本通道**。实现为 **pnpm monorepo**（Node **≥ 20**），结构对齐上游 **[HKUDS/nanobot](https://github.com/HKUDS/nanobot)**（Python），**并非** 1:1 功能等价。
 
-> **说明**：本仓库是**部分移植**（结构 + 核心 Agent + 微信文本通道等），**并非**与上游 Python 版 1:1 功能等价。完整对照请运行 **`pnpm --filter nanobot start -- parity`**（需先 `pnpm build`），或查看 `packages/nanobot/src/nanobot/PARITY.ts`。
+> 能力对照：构建后执行 `pnpm --filter nanobot start -- parity`，或查看 `packages/nanobot/src/nanobot/PARITY.ts`。
+
+---
+
+## 目录
+
+- [功能概览](#功能概览)
+- [Monorepo 结构](#monorepo-结构)
+- [快速开始](#快速开始)
+- [一键：Web + 微信](#一键web--微信)
+- [管理端（Admin）](#管理端admin)
+- [Kimi / Moonshot 区域](#kimi--moonshot-区域与模型参数)
+- [环境变量](#环境变量摘要)
+- [CLI 命令](#cli-命令)
+- [配置要点](#配置项要点nanobotconfigjson)
+- [工具与安全](#工具与安全)
+- [开发与构建](#开发)
+- [目录结构（节选）](#目录结构节选)
+- [常见问题](#常见问题)
+- [许可证与致谢](#许可证与致谢)
 
 ---
 
@@ -10,36 +29,36 @@
 
 | 能力 | 状态 |
 |------|------|
-| 终端交互 REPL / `-m` 单条消息 | 支持 |
-| 记忆：`MEMORY.md` + 按 session 持久化最近对话（`.nanobot-runtime/memory/`） | 支持 |
-| Kimi(Moonshot) / OpenAI / OpenRouter 等兼容端点 | 支持（统一 OpenAI SDK） |
-| 函数工具：`read_file` / `list_dir` / `search_repo` / `write_file` | 支持 |
-| 可选 `run_shell`（配置或 CLI 显式开启） | 支持 |
-| 个人微信 iLink：扫码登录、长轮询、文本收发 → Agent | 支持（无图片/语音 CDN 解密） |
-| `channels.weixin.enabled` 与 `pnpm nanobot` 并联长轮询 | 支持 |
-| **B 端 Web 控制台**：概览、供应商与模型、高级配置（读写 `nanobot.config.json`） | 支持（`packages/admin`） |
+| 终端 REPL / `-m` 单条消息 | ✅ |
+| 记忆：`MEMORY.md` + 按 session 持久化（`.nanobot-runtime/memory/`） | ✅ |
+| Kimi / OpenAI / OpenRouter 等兼容端点（OpenAI SDK） | ✅ |
+| 工具：`read_file` / `list_dir` / `search_repo` / `write_file`；可选 `run_shell` | ✅ |
+| 微信 iLink：扫码登录、长轮询、纯文本 ↔ Agent（无图片/语音 CDN 解密） | ✅ |
+| Web 管理台：概览、对话、**技能管理**（列表 / GitHub 导入）、模型与供应商、高级配置 | ✅ |
+| 配置项：`agents.displayName`、`askNicknameOnStart`；CLI `/alias` 会话称呼 | ✅ |
 | Gateway / 多通道总线 / MCP / 完整 Cron | 多为 stub，见 PARITY |
 
 ---
 
 ## 环境要求
 
-- **Node.js ≥ 20**
-- **pnpm**（建议与根目录 `packageManager` 字段一致，当前为 **pnpm@9**）
-- 网络可达所选 LLM 的 API（国内 Kimi 需能访问 `api.moonshot.cn`）
-- 使用微信通道时需能访问 `https://ilinkai.weixin.qq.com`（或你在配置中指定的 `base_url`）
+- **Node.js ≥ 20**、**pnpm**（建议 **pnpm@9**，见根目录 `packageManager`）
+- 所选 LLM API 网络可达（国内 Kimi：`api.moonshot.cn`）
+- 微信通道：可访问 `https://ilinkai.weixin.qq.com`（或配置中的 `base_url`）
+- 从管理端 **GitHub 导入技能** 时本机需有 **`git`**
 
 ---
 
 ## Monorepo 结构
 
-| 包 | 说明 |
-|----|------|
-| **根目录** | 工作区脚本：`pnpm build`、`pnpm dev:admin`、`pnpm nanobot` 等 |
-| **`packages/nanobot`** | CLI：`nanobot` / `dist/cli.js`，配置与 Agent 核心代码 |
-| **`packages/admin`** | 管理端：Vite 8 + Ant Design 6 + React Compiler；开发时 API 默认 `127.0.0.1:18791` |
+| 路径 | 说明 |
+|------|------|
+| **`packages/nanobot`** | CLI（`dist/cli.js`）、配置与 Agent、微信桥、`api-lib`（供 Nest 打包） |
+| **`packages/api`** | **NestJS** 管理 API：`/api/config`、`/api/chat`、`/api/skills`、`/api/weixin/login` 等 |
+| **`packages/admin`** | **Vite + React + Ant Design** 管理 UI；开发时通过代理访问 API |
+| **根目录** | `nanobot.config.json`、脚本 `pnpm dev:admin`、`pnpm dev:all` 等 |
 
-配置文件默认放在**仓库根目录**的 `nanobot.config.json`（代码会从 `packages/nanobot` 向上查找该文件）。
+配置默认在**仓库根** `nanobot.config.json`（自 `packages/nanobot` 向上解析）。
 
 ---
 
@@ -50,41 +69,50 @@ pnpm install
 pnpm build
 ```
 
-### 1. 配置密钥（推荐 `.env`）
-
-在仓库根目录自建 `.env`（该文件应在 `.gitignore` 中）：
+### 1. 密钥（推荐根目录 `.env`）
 
 ```env
-# 国内 Kimi 开放平台申请的 Key
 MOONSHOT_API_KEY=sk-...
 ```
 
-密钥也可写在 `nanobot.config.json` 的 `providers.<name>.apiKey`（**不要提交到 Git**）。
+也可写在 `nanobot.config.json` 的 `providers.<name>.apiKey`（**勿提交 Git**）。
 
 ### 2. 配置文件
 
-默认读取**仓库根目录** `nanobot.config.json`（可通过环境变量 `NANOBOT_CONFIG` 指向其他路径）。
-
-若尚无配置文件，可在构建后执行：
+默认读取根目录 `nanobot.config.json`（可用 `NANOBOT_CONFIG` 覆盖路径）。若无配置：
 
 ```bash
 pnpm --filter nanobot start -- onboard
 ```
 
-再按需编辑 `agents.defaults`、`providers`、`tools`、`channels.weixin` 等。
+按需编辑 `agents.defaults`、`providers`、`tools.workspaceRoot`、`channels.weixin` 等。
 
-### 3. 启动终端助手
+### 3. 终端助手
 
 ```bash
 pnpm nanobot
-# 等价于在 packages/nanobot 下执行 node dist/cli.js
 ```
 
-slash 命令：`/help`、`/new`（清空对话并删本会话记忆文件）、`/memory`（路径提示）、`/status`、`/exit` 等。
+Slash：`/help`、`/new`、`/memory`、`/status`、**`/alias <称呼>`**、`/exit` 等。
 
-### 4.（可选）B 端控制台
+---
 
-**开发**（同时起管理 API + Vite 前端，前端通过代理访问 `/api`）：
+## 一键：Web + 微信
+
+| 命令 | 说明 |
+|------|------|
+| **`pnpm dev:all`** | **管理端联调**（`pnpm dev:admin`）+ **微信长轮询**；后者由 `scripts/weixin-retry.mjs` 在退出后约 **8s 自动重试**（适合先启动再在 B 端扫码登录）。 |
+| **`pnpm start:all`** | **生产形态**：`pnpm start:admin` + 同上微信重试（需先 `pnpm build`）。 |
+
+仅开 API + 前端、不要微信：`pnpm dev:admin` 或 `pnpm start:admin`。
+
+**重要**：概览里「已配置 token」只表示登录态文件就绪；**必须**在终端看到 **`[weixin] channel: long-poll ready`** 才会处理微信消息。仅 `pnpm start:admin` **不会**拉起长轮询。
+
+---
+
+## 管理端（Admin）
+
+**开发**（API 热重载 + Vite HMR）：
 
 ```bash
 pnpm dev
@@ -92,36 +120,30 @@ pnpm dev
 pnpm dev:admin
 ```
 
-浏览器打开终端里提示的本地地址（默认 `http://127.0.0.1:5173`）。
+- 浏览器打开终端中的 **Vite 地址**（常见 **`http://127.0.0.1:5173`** 或 **`http://localhost:5173`**；以终端为准）。
+- 页面 `/api` 由 Vite **代理**到 **`http://127.0.0.1:18791`**（须先起 API）。
+- 开发模式下 API 进程若设置 `NANOBOT_API_DEV=1`，**不会**托管旧的 `dist-web`，避免误以为刷新即更新前端。
 
-**生产形态**（需先 `pnpm build`）：
+**生产**（先 `pnpm build`）：
 
 ```bash
 pnpm start:admin
 ```
 
-会在 `127.0.0.1:18791` 提供 API 与静态页面（环境变量 **`ADMIN_PORT`** 或 **`PORT`** 可改端口）。仅绑定本机回环地址，请勿在未加认证的情况下暴露到公网。
+在 **`127.0.0.1:18791`**（`ADMIN_PORT` / `PORT` 可改）提供 API；若已构建 `packages/admin/dist-web`，可同时托管静态管理页。**勿在未认证场景暴露公网。**
 
-### 5.（可选）微信通道
+**技能**：侧栏 **技能管理** — 列出 `<workspaceRoot>/skills/*/SKILL.md`；支持 **GitHub 克隆导入**、搜索（可选扩大至非 `nanobot-skill` 主题仓库）。工作区目录与 **`tools.workspaceRoot`** 一致。
 
-```bash
-pnpm --filter nanobot start -- channels weixin login
-```
-
-在 `nanobot.config.json` 中设置 `channels.weixin.enabled: true` 后，**同一进程**下 `pnpm nanobot` 会在后台并联微信长轮询（须已成功 login 或已配置有效 `token`）。
+**微信登录**：概览通道卡片可 **扫码关联**（写入 `.nanobot-runtime/weixin/account.json`），仍需单独长轮询进程（见上节）。
 
 ---
 
 ## Kimi / Moonshot 区域与模型参数
 
-- **国内账号**（[platform.moonshot.cn](https://platform.moonshot.cn)）生成的 API Key 必须使用：
-
-  `"baseUrl": "https://api.moonshot.cn/v1"`
-
-- **国际站** Key 使用：`https://api.moonshot.ai/v1`  
-  混用会导致 **HTTP 401**。
-
-- 部分模型（如 `kimi-k2.5`）仅允许 **`temperature: 1`**，本仓库已对 `moonshot` provider 自动处理。
+- **国内 Key**（[platform.moonshot.cn](https://platform.moonshot.cn)）→ `"baseUrl": "https://api.moonshot.cn/v1"`
+- **国际 Key** → `https://api.moonshot.ai/v1`  
+  混用易导致 **401**。
+- 部分模型（如 `kimi-k2.5`）仅允许 **`temperature: 1`**，已对 `moonshot` provider 自动处理。
 
 ---
 
@@ -129,165 +151,130 @@ pnpm --filter nanobot start -- channels weixin login
 
 | 变量 | 作用 |
 |------|------|
-| `MOONSHOT_API_KEY` / `KIMI_API_KEY` | Moonshot 密钥 |
+| `MOONSHOT_API_KEY` / `KIMI_API_KEY` | Moonshot |
 | `OPENAI_API_KEY` | OpenAI |
 | `OPENROUTER_API_KEY` | OpenRouter |
-| `NANOBOT_PROVIDER` + `NANOBOT_API_KEY` | 同时指定 provider 与密钥，覆盖默认 |
-| `NANOBOT_CONFIG` | `nanobot.config.json` 路径 |
-| `NANOBOT_WORKSPACE` | 工具默认工作区根目录 |
-| `NANOBOT_WEIXIN_VERBOSE` | `1` / `true` 时打印微信轮询与消息处理详细日志 |
-| `ADMIN_PORT` / `PORT` | 管理端 HTTP 端口（默认 `18791`） |
+| `NANOBOT_CONFIG` | 配置文件路径 |
+| `NANOBOT_WORKSPACE` | 工具默认工作区 |
+| `NANOBOT_WEIXIN_VERBOSE` | `1` / `true` 时微信详细日志 |
+| `NANOBOT_API_DEV` | API 开发模式（由 `start:dev` 注入；不托管 admin 静态包） |
+| `ADMIN_PORT` / `PORT` | 管理 API 端口（默认 **18791**） |
 
-`.env` 先于 CWD 加载仓库根 `.env`，再由当前工作目录 `.env` 覆盖；已处理 UTF-8 BOM（见 `packages/nanobot/src/load-env.ts`）。
+`.env`：先加载仓库根 `.env`，再加载当前工作目录 `.env`（见 `packages/nanobot/src/load-env.ts`）。
 
 ---
 
 ## CLI 命令
 
-全局选项（多数子命令前可用）：`-c, --config <path>`，`-w, --workspace <path>`。
+全局选项：`-c, --config`、`-w, --workspace`（见 `pnpm --filter nanobot start -- --help`）。
 
-以下均在仓库根目录执行（需已 `pnpm build`）：
+在仓库根（需已 `pnpm build`）常用：
 
 | 命令 | 说明 |
 |------|------|
-| `pnpm --filter nanobot start -- agent`（默认子命令） | 交互 REPL；`-m "..."` 单条；`--allow-shell` |
-| `pnpm --filter nanobot start -- status` | 配置路径与各 provider 密钥是否就绪 |
-| `pnpm --filter nanobot start -- onboard` | 写入默认配置；`--wizard` / `--sync-templates` / `--refresh-only` |
-| `pnpm --filter nanobot start -- parity` | 打印与上游 Python 的能力矩阵 |
-| `pnpm --filter nanobot start -- gateway` | **stub**：演示启动顺序，不监听真实 HTTP |
-| `pnpm --filter nanobot start -- channels status` / `channels login` | 通道占位说明 / stub |
-| `pnpm --filter nanobot start -- channels weixin login` | 微信 iLink 扫码登录 |
-| `pnpm --filter nanobot start -- channels weixin start` | 仅运行微信长轮询（不与 REPL 并联） |
-| `pnpm --filter nanobot start -- cron list` / `cron add` | 列表 / 添加任务（add 为 stub） |
-| `pnpm --filter nanobot start -- provider login <name>` | stub |
+| `pnpm nanobot` | 默认进入 **agent** REPL；`-m "..."` 单条；`--allow-shell` |
+| `pnpm --filter nanobot start -- status` | 配置与密钥就绪情况 |
+| `pnpm --filter nanobot start -- onboard` | 写入默认配置 |
+| `pnpm --filter nanobot start -- parity` | 与上游能力矩阵 |
+| `pnpm --filter nanobot start -- channels weixin login` | 微信扫码登录 |
+| `pnpm --filter nanobot start -- channels weixin start` | **仅**微信长轮询 |
 
 示例：
 
 ```bash
 pnpm --filter nanobot start -- status
 pnpm --filter nanobot start -- -m "用一句话介绍本项目"
-pnpm --filter nanobot start -- channels weixin start --allow-shell
 ```
-
-也可 `cd packages/nanobot` 后使用 `node dist/cli.js …` 或 `pnpm start -- …`。
 
 ---
 
 ## 配置项要点（`nanobot.config.json`）
 
-- **`agents.defaults`**：`provider`（如 `moonshot`）、`model`（如 `kimi-k2.5`）。
-- **`providers.<id>.baseUrl` / `apiKey`**：各兼容端点；Key 可留空改由 `.env` 提供。
-- **`tools`**：
-  - `workspaceRoot`：文件工具根目录。
-  - `allowShell`：是否注册并允许 `run_shell`（高危，默认建议 `false`）。
-  - `allowWrite`：`false` 时不暴露 `write_file` 且拒绝写入。
-- **`agents.memory`**（可选）：
-  - `enabled`：默认 `true`；`false` 时不注入、不落盘会话记忆。
-  - `maxPersistedMessages`：每会话 JSON 中保留的条数上限（user/assistant 各算一条），默认 `40`。
-  - 工作区根目录 **`MEMORY.md`**：用 `## 标题` 分块，会注入 system（启用记忆时）。
-  - 会话文件：`<repo>/.nanobot-runtime/memory/sessions/<session>.json`（`session` 来自 `-s` 或微信 `weixin:<用户id>`）。
-- **`channels.weixin`**：
-  - `enabled`：是否与默认 `agent` 并联启动长轮询。
-  - `allow_from`：非空时仅处理这些微信用户 id。
-  - `base_url`、`poll_timeout` 等见 `packages/nanobot/src/config.ts` 注释。
+- **`agents.defaults`**：`provider`、`model`。
+- **`agents.displayName` / `agents.askNicknameOnStart`**：全局助手称呼；开启记忆且首轮可引导询问昵称（管理端「高级配置」可改）。
+- **`providers.*`**：`baseUrl`、`apiKey`（可留空走环境变量）。
+- **`tools`**：`workspaceRoot`、`allowShell`、`allowWrite`。
+- **`agents.memory`**：`enabled`、`maxPersistedMessages`；`MEMORY.md` 与 `sessions/*.json` 路径见代码注释。
+- **`channels.weixin`**：`enabled`、`allow_from`、`base_url`、`token` 等（见 `packages/nanobot/src/config.ts`）。
 
-**注意**：磁盘上的 `nanobot.config.json` 会与 `defaultConfig()` 深度合并，**JSON 中的字段覆盖代码默认值**（例如仅改 `packages/nanobot/src/config.ts` 的默认 `enabled` 不会生效，若 JSON 里仍为 `false`）。
+磁盘 JSON 与 `defaultConfig()` **深度合并**，以 JSON 为准。
 
 ---
 
 ## 工具与安全
 
-- 所有文件路径限制在 **`workspaceRoot`** 内，并做路径穿越检查。
-- **`write_file`** 拒绝敏感路径（如 `.env`、常见私钥名、`.nanobot-runtime/weixin/account.json`、`.pem/.p12/.pfx` 等），见 `packages/nanobot/src/tools/writeGuard.ts`。
-- **`run_shell`** 仅在显式开启时使用，在**工作区根目录**执行命令，风险自负。
+- 文件工具限制在 **`workspaceRoot`** 内，防路径穿越。
+- **`write_file`** 拦截敏感路径（`.env`、私钥名、`weixin/account.json`、证书后缀等）。
+- **`run_shell`** 仅在显式开启时使用，风险自负。
 
 ---
 
 ## 开发
 
-### 根目录常用脚本
+### 根目录脚本
 
 | 命令 | 作用 |
 |------|------|
-| `pnpm build` | 构建所有包（CLI `dist/cli.js` + 管理端 `dist-web` / `dist-server`） |
-| `pnpm typecheck` | 全工作区 TypeScript 检查 |
-| `pnpm dev` / `pnpm dev:admin` | 管理端：API + Vite 联调 |
-| `pnpm dev:cli` | CLI：`vite-node --watch` 跑 `packages/nanobot/src/cli.ts` |
-| `pnpm nanobot` | 运行已构建的 CLI（生产 bundle） |
-| `pnpm start:admin` | 运行已构建的管理端服务 |
+| `pnpm build` | 构建全部包（nanobot CLI + `api-lib` + Nest `dist` + admin `dist-web`） |
+| `pnpm typecheck` | 全工作区 TS 检查 |
+| `pnpm dev` / `pnpm dev:admin` | Admin：**API `start:dev`**（lib watch + nodemon）+ **Vite**（`wait-on` 健康检查后启动） |
+| `pnpm dev:api` | 仅 Nest API 开发 |
+| `pnpm dev:cli` | `vite-node --watch` 跑 CLI 源码 |
+| `pnpm dev:all` | `dev:admin` + 微信长轮询重试脚本 |
+| `pnpm nanobot` | 运行已构建 CLI |
+| `pnpm start:admin` / `pnpm start:api` | 运行已构建 Nest（`node dist/main.js`） |
+| `pnpm start:all` | `start:admin` + 微信长轮询重试 |
 
-### CLI 包内（`packages/nanobot`）
+### `packages/nanobot`
 
 ```bash
 cd packages/nanobot
-pnpm run dev          # vite-node --watch src/cli.ts（改源码重启进程）
-pnpm run start:reload # 先 build，再监听 dist + node --watch（见 scripts/reload-dist.mjs）
-pnpm run build:watch  # 仅监听重打包 dist/cli.js
-pnpm run typecheck
+pnpm dev              # vite-node --watch src/cli.ts
+pnpm run build:lib    # 打 Nest 用的 lib/api-lib.cjs
 pnpm run build
+pnpm run typecheck
 ```
 
-**热重载说明**
-
-| 命令 | 行为 |
-|------|------|
-| `pnpm dev`（在 `packages/nanobot`） | 不经过 `dist`，由 **vite-node** 监视 `src` 并**重启整个 Node 进程**（REPL 会话会丢）。 |
-| `pnpm run start:reload` | 先完整 `build`，再并行 **Vite watch 打包** 与 **`node --watch dist/cli.js`**；改 TS 后自动重编并重启 CLI。 |
-| `pnpm nanobot`（根目录） | 无热重载，适合稳定运行。 |
-
-微信长轮询与 REPL 同进程时，进程重启会断开长轮询，属预期现象。
+改 **`api-lib` 或 Nest 引用的 nanobot 源码** 后，在 `packages/api` 侧会随 **`start:dev`** 重编/重启；详见 `packages/api/package.json` 与 `nodemon.json`。
 
 ---
 
 ## 目录结构（节选）
 
 ```
-packages/nanobot/
-  src/
-    cli.ts                 # 入口：先 load-env，再 commander
-    load-env.ts
-    config.ts              # 配置加载、合并、路径（会向上查找根目录 nanobot.config.json）
-    agent.ts
-    providers/             # OpenAI 兼容客户端与错误说明
-    tools/                 # 工具定义与执行
-    nanobot/
-      cli/                 # 各子命令实现
-      channels/weixin/     # iLink 桥接
-      command/             # REPL slash 路由
-      PARITY.ts            # 与上游对照表
-  docs/
-    PRINCIPLES.md          # 数据流与扩展点（若存在）
-packages/admin/
-  src/                     # React 管理端页面
-  server/index.ts          # 管理 API + 生产静态资源
+packages/nanobot/src/
+  cli.ts, config.ts, agent.ts, load-env.ts
+  providers/          # OpenAI 兼容客户端
+  tools/              # 工具定义与执行
+  nanobot/
+    cli/              # 子命令
+    channels/weixin/  # iLink
+    command/          # REPL slash
+    skills/           # 技能加载、GitHub 导入、todo 等
+    memory/           # MEMORY.md + session JSON
+    PARITY.ts
+packages/api/src/     # Nest：config/chat/skills/weixin 等控制器
+packages/admin/src/   # React 管理页
+scripts/weixin-retry.mjs
 ```
 
-运行时状态（微信登录态等）：`<repo>/.nanobot-runtime/`（建议勿提交）。
+运行时数据：`.nanobot-runtime/`（建议 **勿提交**，已在 `.gitignore`）。
 
 ---
 
 ## 常见问题
 
-1. **401 Invalid Authentication**  
-   检查 Key 是否与 `baseUrl` 同属国内或国际；`pnpm --filter nanobot start -- status` 是否显示 `ready`。
-
-2. **400 temperature**  
-   Moonshot 部分模型仅支持 `temperature: 1`，已按 provider 自动设置。
-
-3. **微信并联不启动**  
-   确认 `nanobot.config.json` 里 `channels.weixin.enabled` 为 `true`，并已 `login`。
-
-4. **微信 `fetch failed` / `ECONNRESET`**  
-   网络或代理问题；可设 `NANOBOT_WEIXIN_VERBOSE=1` 查看详细日志。
-
-5. **管理端页面报「无法连接管理 API」**  
-   开发模式需同时起 API：使用 `pnpm dev:admin`，并确认 18791 未被占用；或检查 Vite 代理 `/api` 是否指向该端口。
+1. **401 / Key** — Key 与 `baseUrl` 国内/国际一致；`pnpm --filter nanobot start -- status` 自检。
+2. **管理端「无法连接 API」** — 使用 `pnpm dev:admin`，确认 **18791** 未被占用；浏览器用 **Vite 端口（如 5173）**，勿只用 API 端口当「前端开发地址」。
+3. **微信不回消息** — 确认终端有 **`[weixin] channel: long-poll ready`**；使用 `pnpm dev:all` 或单独 `channels weixin start`；检查 `allow_from`、仅文本、可设 `NANOBOT_WEIXIN_VERBOSE=1`。
+4. **微信 `fetch failed`** — 网络/代理；开详细日志排查。
+5. **Moonshot 400 temperature** — 已按 provider 处理；仍报错时核对模型名与文档。
 
 ---
 
 ## 许可证与致谢
 
-- 上游概念与协议对齐 **[HKUDS/nanobot](https://github.com/HKUDS/nanobot)**。  
-- 本 TypeScript 实现的许可证以仓库内 `LICENSE` 为准（若未添加，请自行补充）。
+- 概念与协议对齐 **[HKUDS/nanobot](https://github.com/HKUDS/nanobot)**。  
+- 本仓库许可证以根目录 **`LICENSE`** 为准（若未添加请自行补充）。
 
-更细的**数据流、调用顺序与扩展点**见 **`packages/nanobot/docs/PRINCIPLES.md`**（若仓库中包含该文件）。
+更细的设计说明见 **`packages/nanobot/docs/PRINCIPLES.md`**。
