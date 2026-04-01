@@ -5,6 +5,8 @@ declare module "nanobot/api-lib" {
     agents: {
       defaults: { model: string; provider: string };
       memory?: { enabled?: boolean; maxPersistedMessages?: number };
+      displayName?: string;
+      askNicknameOnStart?: boolean;
     };
     tools: { allowShell: boolean; workspaceRoot?: string; allowWrite?: boolean };
     channels?: { weixin?: { token?: string; [k: string]: unknown } };

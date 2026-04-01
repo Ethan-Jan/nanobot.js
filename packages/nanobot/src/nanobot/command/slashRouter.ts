@@ -10,7 +10,8 @@
  */
 
 import type { NanobotConfig } from "../../config.js";
-import { isMemoryEnabled, sessionMemoryFilePath } from "../memory/memoryStore.js";
+import { isMemoryEnabled, sessionMemoryFilePath, setSessionAgentDisplayName } from "../memory/memoryStore.js";
+import { getCodeAnalysisReport, listAvailableSkills } from "../skills/skillsLoader.js";
 
 export type SlashOutcome = "exit" | "continue" | "consumed";
 
@@ -86,9 +87,59 @@ export async function handleSlashLine(
       return "consumed";
     }
 
+    case "alias":
+    case "nick":
+    case "nickname": {
+      if (!arg) {
+        write("[nanobot] /alias <称呼> — 设置本会话助手昵称（写入会话 JSON，优先于默认名、低于配置 agents.displayName）。\n");
+        return "consumed";
+      }
+      try {
+        await setSessionAgentDisplayName(ctx.sessionKey, arg);
+        write(`[nanobot] 已设置称呼为「${arg.trim()}」；下一条对话起生效（REPL 下一行输入前会刷新 system）。\n`);
+      } catch (e) {
+        write(`[nanobot] /alias 失败：${e instanceof Error ? e.message : String(e)}\n`);
+      }
+      return "consumed";
+    }
+
+    /** 代码分析：生成项目概览报告 */
+    case "analyze":
+    case "stats": {
+      try {
+        write("[nanobot] 正在分析代码库...\n\n");
+        const report = await getCodeAnalysisReport(ctx.workspaceRoot);
+        write(report + "\n");
+      } catch (e) {
+        write(`[nanobot] 分析失败：${e instanceof Error ? e.message : String(e)}\n`);
+      }
+      return "consumed";
+    }
+
+    /** 列出可用的技能和工具 */
+    case "skills": {
+      try {
+        const skills = await listAvailableSkills(ctx.workspaceRoot);
+        write(`[nanobot] /skills\n\n${skills}\n`);
+      } catch (e) {
+        write(`[nanobot] 加载失败：${e instanceof Error ? e.message : String(e)}\n`);
+      }
+      return "consumed";
+    }
+
     case "help":
       write(
-        "[nanobot] /help：/new /memory /status /stop /restart /exit | 普通消息直接对话。\n",
+        "[nanobot] /help：\n" +
+        "  /new       - 清空对话和记忆\n" +
+        "  /alias     - 设置本会话助手称呼（/alias 小智）\n" +
+        "  /memory    - 显示记忆文件路径\n" +
+        "  /status    - 显示配置状态\n" +
+        "  /analyze   - 分析代码库结构\n" +
+        "  /skills    - 列出可用技能\n" +
+        "  /stop      - 取消当前任务\n" +
+        "  /restart   - 重启（手动）\n" +
+        "  /exit      - 退出\n" +
+        "\n普通消息直接对话，可使用 git_*、file_stats 等工具。\n"
       );
       return "consumed";
 

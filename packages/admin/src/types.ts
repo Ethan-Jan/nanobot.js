@@ -10,6 +10,10 @@ export type NanobotConfigDTO = {
   agents: {
     defaults: { model: string; provider: string };
     memory?: { enabled?: boolean; maxPersistedMessages?: number };
+    /** 全局助手称呼；不填则默认「nanobot（小纳）」或各会话 /alias */
+    displayName?: string;
+    /** 需开启记忆：本会话尚无称呼且无持久化对话时，首轮引导模型询问昵称 */
+    askNicknameOnStart?: boolean;
   };
   tools: {
     allowShell: boolean;

@@ -21,6 +21,7 @@ export default function ConfigPage() {
   const [form] = Form.useForm<{
     tools: NanobotConfigDTO["tools"];
     memory: NonNullable<NanobotConfigDTO["agents"]["memory"]>;
+    persona: { displayName?: string; askNicknameOnStart?: boolean };
     weixin: NonNullable<NanobotConfigDTO["channels"]>["weixin"];
   }>();
 
@@ -40,6 +41,10 @@ export default function ConfigPage() {
           enabled: c.agents.memory?.enabled ?? true,
           maxPersistedMessages: c.agents.memory?.maxPersistedMessages ?? 40,
         },
+        persona: {
+          displayName: c.agents.displayName ?? "",
+          askNicknameOnStart: c.agents.askNicknameOnStart ?? false,
+        },
         weixin: wx,
       });
     } catch (e) {
@@ -56,6 +61,7 @@ export default function ConfigPage() {
   const onFinish = async (values: {
     tools: NanobotConfigDTO["tools"];
     memory: NonNullable<NanobotConfigDTO["agents"]["memory"]>;
+    persona: { displayName?: string; askNicknameOnStart?: boolean };
     weixin: NonNullable<NanobotConfigDTO["channels"]>["weixin"];
   }) => {
     if (!cfg) return;
@@ -66,6 +72,7 @@ export default function ConfigPage() {
       if (t) weixinPatch.token = t;
       else delete weixinPatch.token;
 
+      const dn = typeof values.persona?.displayName === "string" ? values.persona.displayName.trim() : "";
       const patch = {
         tools: values.tools,
         agents: {
@@ -73,6 +80,8 @@ export default function ConfigPage() {
             enabled: values.memory.enabled,
             maxPersistedMessages: values.memory.maxPersistedMessages,
           },
+          displayName: dn,
+          askNicknameOnStart: Boolean(values.persona?.askNicknameOnStart),
         },
         channels: {
           weixin: weixinPatch,
@@ -92,6 +101,10 @@ export default function ConfigPage() {
         memory: {
           enabled: updated.agents.memory?.enabled ?? true,
           maxPersistedMessages: updated.agents.memory?.maxPersistedMessages ?? 40,
+        },
+        persona: {
+          displayName: updated.agents.displayName ?? "",
+          askNicknameOnStart: updated.agents.askNicknameOnStart ?? false,
         },
         weixin: weixinFields,
       });
@@ -142,6 +155,23 @@ export default function ConfigPage() {
               <InputNumber min={1} max={500} />
             </Form.Item>
           </Space>
+
+          <Typography.Title level={5}>助手称呼</Typography.Title>
+          <Typography.Paragraph type="secondary" style={{ marginBottom: 8 }}>
+            此处为<strong>全局</strong>称呼（优先）；留空时用语义默认「nanobot（小纳）」或各会话在终端执行的{" "}
+            <Typography.Text code>/alias 昵称</Typography.Text>（写入会话 JSON）。
+          </Typography.Paragraph>
+          <Form.Item label="全局显示名（留空则用默认 nanobot（小纳）或会话 /alias）" name={["persona", "displayName"]}>
+            <Input placeholder="例如：小智、CodeBuddy" allowClear />
+          </Form.Item>
+          <Form.Item
+            label="首轮询问昵称"
+            name={["persona", "askNicknameOnStart"]}
+            valuePropName="checked"
+            extra="仅当记忆启用、本会话尚无称呼且无已持久化对话时，在 system 中引导模型先问用户想起什么称呼。"
+          >
+            <Switch />
+          </Form.Item>
 
           <Typography.Title level={5}>微信通道</Typography.Title>
           <Space wrap size="large">

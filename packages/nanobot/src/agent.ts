@@ -16,16 +16,6 @@ import {
   isMemoryEnabled,
   memoryPersistLimit,
 } from "./nanobot/memory/memoryStore.js";
-const SYSTEM = `你是 nanobot，简洁、可靠的本地编程助手。
-
-**工具（在有用时自动调用）** — 不要凭空猜测磁盘上的文件内容或项目结构：
-- 在断言「项目里有什么」之前，先用 list_dir、search_repo、read_file 核实。
-- 仅在用户明确要求修改或新建文件时使用 write_file；无法写入敏感路径（.env、密钥、微信 account.json、证书等）。
-- run_shell 仅在配置中显式开启时可用；默认视为关闭，除非你看到成功的 shell 输出。
-
-回答尽量简短；需要时给出代码。若工具调用失败，说明原因并给出可行修复建议。
-
-（系统可能附带「长期备忘 MEMORY.md」与「近期已持久化对话」摘要，请当作上下文参考。）`;
 
 const MAX_MODEL_ROUNDS = 48;
 
@@ -153,7 +143,7 @@ export async function runAgentMessage(
   };
   const tools = toolDefinitions(policy.allowShell ?? false, policy.allowWrite !== false);
   const sessionKey = opts?.sessionKey ?? "cli:direct";
-  const systemContent = await buildFullSystemPrompt(SYSTEM, cfg, policy.workspaceRoot ?? process.cwd(), sessionKey);
+  const systemContent = await buildFullSystemPrompt(cfg, policy.workspaceRoot ?? process.cwd(), sessionKey);
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     { role: "system", content: systemContent },
     { role: "user", content: userMessage },
@@ -198,7 +188,7 @@ export async function runAgentWithHistory(
   };
   const tools = toolDefinitions(policy.allowShell ?? false, policy.allowWrite !== false);
   const sessionKey = opts?.sessionKey ?? "admin:web";
-  const systemContent = await buildFullSystemPrompt(SYSTEM, cfg, policy.workspaceRoot ?? process.cwd(), sessionKey);
+  const systemContent = await buildFullSystemPrompt(cfg, policy.workspaceRoot ?? process.cwd(), sessionKey);
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
     { role: "system", content: systemContent },
     ...prior.map((m) => ({ role: m.role, content: m.content })),
@@ -234,7 +224,8 @@ export async function runAgentLoop(cfg: NanobotConfig, opts?: AgentRunOptions): 
   const tools = toolDefinitions(policy.allowShell ?? false, policy.allowWrite !== false);
 
   const sessionKey = opts?.sessionKey ?? "cli:direct";
-  const systemContent = await buildFullSystemPrompt(SYSTEM, cfg, policy.workspaceRoot ?? process.cwd(), sessionKey);
+  const workspace = policy.workspaceRoot ?? process.cwd();
+  const systemContent = await buildFullSystemPrompt(cfg, workspace, sessionKey);
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [{ role: "system", content: systemContent }];
 
   let weixinBridge: WeixinIlinkBridge | undefined;
@@ -253,13 +244,13 @@ export async function runAgentLoop(cfg: NanobotConfig, opts?: AgentRunOptions): 
   }
 
   const rl = readline.createInterface({ input, output });
-  output.write('nanobot — type "exit" or Ctrl+C to quit. Slash: /help /new /memory /status\n');
+  output.write('nanobot — type "exit" or Ctrl+C or quit. Slash: /help /new /alias /memory /status\n');
   output.write(`Workspace: ${policy.workspaceRoot}\n`);
 
   const resetConversation = async (): Promise<void> => {
     if (isMemoryEnabled(cfg)) await clearSessionMemory(sessionKey);
     messages.length = 0;
-    const next = await buildFullSystemPrompt(SYSTEM, cfg, policy.workspaceRoot ?? process.cwd(), sessionKey);
+    const next = await buildFullSystemPrompt(cfg, workspace, sessionKey);
     messages.push({ role: "system", content: next });
   };
 
@@ -282,6 +273,8 @@ export async function runAgentLoop(cfg: NanobotConfig, opts?: AgentRunOptions): 
       if (slash === "exit") break;
       if (slash === "consumed") continue;
 
+      const freshSystem = await buildFullSystemPrompt(cfg, workspace, sessionKey);
+      messages[0] = { role: "system", content: freshSystem };
       messages.push({ role: "user", content: user });
 
       await runModelToolRounds(client, model, messages, tools, policy, (t) => output.write(`\n${t}\n`), {

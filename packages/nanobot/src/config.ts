@@ -27,6 +27,16 @@ export interface MemoryConfig {
 export interface AgentsConfig {
   defaults: AgentDefaults;
   memory?: MemoryConfig;
+  /**
+   * 助手对外称呼（写入 nanobot.config.json 全局生效）。
+   * 不填时用语义默认「nanobot（小纳）」或本会话在 `.nanobot-runtime/memory/sessions/*.json` 里存的 `agentDisplayName`（见 /alias）。
+   */
+  displayName?: string;
+  /**
+   * true：在启用记忆且本会话尚无称呼、且无持久化对话时，让模型首轮先礼貌询问用户想起什么昵称。
+   * 关闭记忆时不生效（无法判断首轮）。
+   */
+  askNicknameOnStart?: boolean;
 }
 
 export interface ToolPolicy {
@@ -173,6 +183,7 @@ export function defaultConfig(): NanobotConfig {
         enabled: true,
         maxPersistedMessages: 40,
       },
+      askNicknameOnStart: false,
     },
     tools: {
       allowShell: false,
@@ -269,6 +280,7 @@ export async function mergeAndSave(patch: Partial<NanobotConfig>): Promise<Nanob
   const merged: NanobotConfig = {
     providers: { ...base.providers },
     agents: {
+      ...base.agents,
       defaults: { ...base.agents.defaults },
       memory: { ...dAgents.memory, ...(base.agents.memory ?? {}) },
     },
@@ -293,6 +305,14 @@ export async function mergeAndSave(patch: Partial<NanobotConfig>): Promise<Nanob
   }
   if (patch.agents?.memory) {
     merged.agents.memory = { ...merged.agents.memory, ...patch.agents.memory };
+  }
+  if (patch.agents?.displayName !== undefined) {
+    const t = String(patch.agents.displayName).trim();
+    if (t) merged.agents.displayName = t;
+    else delete merged.agents.displayName;
+  }
+  if (patch.agents?.askNicknameOnStart !== undefined) {
+    merged.agents.askNicknameOnStart = patch.agents.askNicknameOnStart;
   }
   if (patch.tools) {
     merged.tools = {
