@@ -69,19 +69,35 @@ export interface NanobotConfig {
 const DEFAULT_MODEL = "kimi-k2.5";
 const DEFAULT_PROVIDER: ProviderName = "moonshot";
 
+function sourceDirForRepoWalk(): string {
+  try {
+    const u = import.meta.url;
+    if (u) {
+      return dirname(fileURLToPath(u));
+    }
+  } catch {
+    /* import.meta.url 在部分 CJS 打包产物中不可用 */
+  }
+  if (typeof __dirname === "string") {
+    return __dirname;
+  }
+  return process.cwd();
+}
+
 /**
  * 工程根：自本文件位置向上查找首个包含 `nanobot.config.json` 的目录；
  * 找不到则回退为 nanobot 包根目录（`src` 的上一级），便于 monorepo 根配置一份文件。
+ * CJS 单文件包（如 api-lib.cjs）从 `__dirname` 或 `process.cwd()` 起爬。
  */
 export function repoRoot(): string {
-  let cur = dirname(fileURLToPath(import.meta.url));
+  let cur = sourceDirForRepoWalk();
   for (let i = 0; i < 14; i++) {
     if (existsSync(join(cur, "nanobot.config.json"))) return cur;
     const parent = dirname(cur);
     if (parent === cur) break;
     cur = parent;
   }
-  return join(dirname(fileURLToPath(import.meta.url)), "..");
+  return join(sourceDirForRepoWalk(), "..");
 }
 
 /**

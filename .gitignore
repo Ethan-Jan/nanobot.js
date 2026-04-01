@@ -2,3 +2,4 @@ node_modules
 dist
 dist-server
 dist-web
+packages/nanobot/lib

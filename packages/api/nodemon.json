@@ -1,0 +1,6 @@
+{
+  "watch": ["dist/main.js", "../nanobot/lib/api-lib.cjs"],
+  "ext": "js,cjs",
+  "delay": 400,
+  "exec": "node dist/main.js"
+}

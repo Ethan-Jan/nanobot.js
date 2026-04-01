@@ -2,14 +2,16 @@
   "name": "nanobot-js",
   "private": true,
   "version": "0.1.0",
-  "description": "Nanobot monorepo: CLI (nanobot) + B-side admin (@nanobot/admin)",
+  "description": "Nanobot monorepo: CLI (nanobot) + API (@nanobot/api) + admin UI (@nanobot/admin)",
   "type": "module",
   "scripts": {
     "build": "pnpm -r run build",
     "dev": "pnpm --filter @nanobot/admin dev",
     "dev:admin": "pnpm --filter @nanobot/admin dev",
+    "dev:api": "pnpm --filter @nanobot/api start:dev",
     "dev:cli": "pnpm --filter nanobot dev",
-    "start:admin": "pnpm --filter @nanobot/admin start",
+    "start:admin": "pnpm --filter @nanobot/api start",
+    "start:api": "pnpm --filter @nanobot/api start",
     "nanobot": "pnpm --filter nanobot start",
     "typecheck": "pnpm -r run typecheck"
   },

@@ -39,11 +39,11 @@ export async function putConfig(patch: Record<string, unknown>): Promise<Nanobot
 
 export type ChatTurn = { role: "user" | "assistant"; content: string };
 
-export async function postChat(messages: ChatTurn[]): Promise<string> {
+export async function postChat(messages: ChatTurn[], sessionId?: string): Promise<string> {
   const r = await fetch("/api/chat", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ messages }),
+    body: JSON.stringify({ messages, sessionId }),
   });
   let data: { reply?: string; error?: string };
   try {

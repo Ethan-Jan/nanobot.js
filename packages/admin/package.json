@@ -5,10 +5,9 @@
   "description": "B-side admin: config + status over HTTP (Ant Design)",
   "type": "module",
   "scripts": {
-    "build": "vite build && vite build --config vite.server.config.ts",
-    "dev": "concurrently -k -n api,ui -c blue,green \"vite-node --watch server/index.ts\" \"vite\"",
-    "start": "node dist-server/server.js",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.server.json"
+    "build": "vite build",
+    "dev": "concurrently -k -n api,ui -c blue,green \"pnpm --filter @nanobot/api start:dev\" \"vite\"",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.1",

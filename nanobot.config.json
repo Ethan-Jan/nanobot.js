@@ -1,43 +1,43 @@
 {
-  "providers": {
-    "openrouter": {
-      "baseUrl": "https://openrouter.ai/api/v1",
-      "apiKey": ""
-    },
-    "openai": {
-      "baseUrl": "https://api.openai.com/v1",
-      "apiKey": ""
-    },
-    "moonshot": {
-      "baseUrl": "https://api.moonshot.cn/v1",
-      "apiKey": "sk-EW4k1arW3z9miLIRRb05s9NZaKdKZP95uukjiXs91MzBCEf1"
-    }
-  },
-  "agents": {
-    "defaults": {
-      "model": "kimi-k2.5",
-      "provider": "moonshot"
-    },
-    "memory": {
-      "enabled": true,
-      "maxPersistedMessages": 40
-    }
-  },
-  "tools": {
-    "allowShell": true,
-    "allowWrite": true,
-    "workspaceRoot": "D:\\Project\\nanobot"
-  },
-  "channels": {
-    "weixin": {
-      "enabled": true,
-      "allow_from": [],
-      "base_url": "https://ilinkai.weixin.qq.com",
-      "cdn_base_url": "https://novac2c.cdn.weixin.qq.com/c2c",
-      "route_tag": null,
-      "token": "",
-      "state_dir": "",
-      "poll_timeout": 35
-    }
-  }
+	"providers": {
+		"openrouter": {
+			"baseUrl": "https://openrouter.ai/api/v1",
+			"apiKey": ""
+		},
+		"openai": {
+			"baseUrl": "https://api.openai.com/v1",
+			"apiKey": ""
+		},
+		"moonshot": {
+			"baseUrl": "https://api.moonshot.cn/v1",
+			"apiKey": "sk-EW4k1arW3z9miLIRRb05s9NZaKdKZP95uukjiXs91MzBCEf1"
+		}
+	},
+	"agents": {
+		"defaults": {
+			"model": "kimi-k2.5",
+			"provider": "moonshot"
+		},
+		"memory": {
+			"enabled": true,
+			"maxPersistedMessages": 40
+		}
+	},
+	"tools": {
+		"allowShell": true,
+		"allowWrite": true,
+		"workspaceRoot": "D:\\Project\\nanobot.js"
+	},
+	"channels": {
+		"weixin": {
+			"enabled": true,
+			"allow_from": [],
+			"base_url": "https://ilinkai.weixin.qq.com",
+			"cdn_base_url": "https://novac2c.cdn.weixin.qq.com/c2c",
+			"route_tag": null,
+			"token": "",
+			"state_dir": "",
+			"poll_timeout": 35
+		}
+	}
 }

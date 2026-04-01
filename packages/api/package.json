@@ -1,0 +1,33 @@
+{
+  "name": "@nanobot/api",
+  "version": "0.1.0",
+  "private": true,
+  "description": "NestJS HTTP API for nanobot admin (config, status, chat) + optional admin static",
+  "scripts": {
+    "prebuild": "pnpm --filter nanobot run build:lib",
+    "build": "nest build",
+    "start": "node dist/main.js",
+    "start:dev": "pnpm --filter nanobot run build:lib && nest build && concurrently -k -n lib,build,serve \"pnpm --filter nanobot run build:lib:watch\" \"nest build --watch\" \"wait-on dist/main.js && nodemon\"",
+    "start:debug": "nest start --debug --watch",
+    "typecheck": "tsc --noEmit -p tsconfig.json"
+  },
+  "dependencies": {
+    "@nestjs/common": "^11.1.0",
+    "@nestjs/core": "^11.1.0",
+    "@nestjs/platform-express": "^11.1.0",
+    "@nestjs/serve-static": "^5.0.0",
+    "nanobot": "workspace:*",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1"
+  },
+  "devDependencies": {
+    "@nestjs/cli": "^11.0.0",
+    "@nestjs/schematics": "^11.0.0",
+    "@types/express": "^5.0.0",
+    "@types/node": "^22.10.0",
+    "concurrently": "^9.1.0",
+    "nodemon": "^3.1.9",
+    "typescript": "^5.7.0",
+    "wait-on": "^8.0.1"
+  }
+}
