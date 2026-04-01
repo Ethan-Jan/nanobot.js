@@ -5,19 +5,22 @@ import {
   SettingOutlined,
   CloudServerOutlined,
   CommentOutlined,
+  ThunderboltOutlined,
 } from "@ant-design/icons";
 import Dashboard from "./pages/Dashboard";
 import ConfigPage from "./pages/ConfigPage";
 import ProvidersPage from "./pages/ProvidersPage";
 import ChatPage from "./pages/ChatPage";
+import SkillsPage from "./pages/SkillsPage";
 
 const { Header, Sider, Content } = Layout;
 
-type MenuKey = "dashboard" | "chat" | "config" | "providers";
+type MenuKey = "dashboard" | "chat" | "skills" | "providers" | "config";
 
 const TITLES: Record<MenuKey, string> = {
   dashboard: "概览",
   chat: "对话",
+  skills: "技能管理",
   providers: "模型与供应商",
   config: "高级配置",
 };
@@ -30,6 +33,7 @@ export default function App() {
   let body: ReactNode;
   if (key === "dashboard") body = <Dashboard />;
   else if (key === "chat") body = <ChatPage />;
+  else if (key === "skills") body = <SkillsPage />;
   else if (key === "config") body = <ConfigPage />;
   else body = <ProvidersPage />;
 
@@ -63,6 +67,7 @@ export default function App() {
           items={[
             { key: "dashboard", icon: <DashboardOutlined />, label: "概览" },
             { key: "chat", icon: <CommentOutlined />, label: "对话" },
+            { key: "skills", icon: <ThunderboltOutlined />, label: "技能管理" },
             { key: "providers", icon: <CloudServerOutlined />, label: "模型与供应商" },
             { key: "config", icon: <SettingOutlined />, label: "高级配置" },
           ]}

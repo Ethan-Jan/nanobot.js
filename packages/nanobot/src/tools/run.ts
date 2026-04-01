@@ -2,8 +2,11 @@ import { mkdir, readdir, readFile, stat, writeFile } from "node:fs/promises";
 import { spawn, exec } from "node:child_process";
 import { dirname, resolve, relative, sep, extname, join } from "node:path";
 import { promisify } from "node:util";
+import { createHash, randomUUID, randomBytes } from "node:crypto";
+import { platform, arch, release, freemem, totalmem, cpus } from "node:os";
 import type { ToolPolicy } from "../config.js";
 import { isWritePathBlocked } from "./writeGuard.js";
+import { runTodoTool } from "../nanobot/skills/todo.js";
 
 const execPromise = promisify(exec);
 
@@ -161,7 +164,7 @@ async function runToolInner(
     return await execInDir(root, command.trim());
   }
 
-  // ===== New Tools =====
+  // ===== Git Tools =====
 
   if (name === "git_status") {
     return await getGitStatus(root);
@@ -182,6 +185,48 @@ async function runToolInner(
 
   if (name === "get_package_info") {
     return await getPackageInfo(root);
+  }
+
+  // ===== Utility Tools =====
+
+  if (name === "calculate") {
+    const expression = String((args as { expression?: string }).expression ?? "");
+    return calculateExpression(expression);
+  }
+
+  if (name === "hash") {
+    const input = String((args as { input?: string }).input ?? "");
+    const algorithm = String((args as { algorithm?: string }).algorithm ?? "sha256") as "md5" | "sha1" | "sha256" | "sha512";
+    const isFile = Boolean((args as { is_file?: boolean }).is_file);
+    return await computeHash(root, input, algorithm, isFile);
+  }
+
+  if (name === "uuid") {
+    const version = String((args as { version?: string }).version ?? "v4") as "v4" | "v7" | "nanoid";
+    let count = Number((args as { count?: number }).count);
+    if (!Number.isFinite(count) || count < 1) count = 1;
+    count = Math.min(10, count);
+    const length = Number((args as { length?: number }).length) || 21;
+    return generateUUIDs(version, count, length);
+  }
+
+  if (name === "datetime") {
+    const format = String((args as { format?: string }).format ?? "iso");
+    const timezone = String((args as { timezone?: string }).timezone ?? "");
+    const timestamp = Number((args as { timestamp?: number }).timestamp);
+    return formatDateTime(format, timezone, timestamp);
+  }
+
+  if (name === "env_info") {
+    const detail = String((args as { detail?: string }).detail ?? "basic") as "basic" | "full";
+    return getEnvInfo(detail);
+  }
+
+  // ===== Todo Tools =====
+
+  if (name.startsWith("todo_")) {
+    const action = name.replace("todo_", "") as "add" | "list" | "update" | "delete" | "stats";
+    return runTodoTool(root, action, args as Record<string, unknown>);
   }
 
   return `Unknown tool: ${name}`;
@@ -445,6 +490,219 @@ async function getPackageInfo(root: string): Promise<string> {
     }
     return `Error reading package.json: ${e instanceof Error ? e.message : String(e)}`;
   }
+}
+
+// ===== Utility Tools Implementation =====
+
+function calculateExpression(expression: string): string {
+  if (!expression.trim()) {
+    return "Error: Empty expression";
+  }
+
+  // Whitelist allowed characters and functions
+  const allowedPattern = /^[\d\s\+\-\*\/\%\(\)\.\,\^\&\|\~\<\>\=\!]+$/;
+  const allowedFunctions = /\b(abs|round|floor|ceil|sqrt|min|max|sin|cos|tan|log|exp|pow|trunc|sign|PI|E)\b/g;
+  
+  // Replace common math constants
+  let sanitized = expression
+    .replace(/\*\*/g, "^")  // Convert ** to ^ for easier processing
+    .replace(/\bPI\b/g, "Math.PI")
+    .replace(/\bE\b/g, "Math.E");
+
+  // Check for dangerous patterns
+  const dangerous = /(eval|function|=>|\{|\}|;|import|export|require|process|global|window|document)/i;
+  if (dangerous.test(expression)) {
+    return "Error: Expression contains disallowed keywords";
+  }
+
+  // Replace allowed function names with Math equivalents
+  const mathFunctions = ["abs", "round", "floor", "ceil", "sqrt", "min", "max", "sin", "cos", "tan", "log", "exp", "pow", "trunc", "sign"];
+  for (const fn of mathFunctions) {
+    const regex = new RegExp(`\\b${fn}\\(`, "g");
+    sanitized = sanitized.replace(regex, `Math.${fn}(`);
+  }
+
+  // Convert ^ back to ** for JavaScript exponentiation
+  sanitized = sanitized.replace(/\^/g, "**");
+
+  // Final safety check - only allow safe characters
+  const cleanPattern = /^[\d\s\+\-\*\/\%\(\)\.\,\*Math\.\<\>\=\!\&\|]+$/;
+  if (!cleanPattern.test(sanitized)) {
+    return "Error: Expression contains invalid characters";
+  }
+
+  try {
+    // eslint-disable-next-line no-new-func
+    const result = new Function(`return (${sanitized})`)();
+    
+    if (typeof result === "number") {
+      if (!Number.isFinite(result)) {
+        return "Error: Result is Infinity or NaN";
+      }
+      // Format result nicely
+      return String(result).includes(".") ? result.toPrecision(12).replace(/\.?0+$/, "") : String(result);
+    }
+    return String(result);
+  } catch (e) {
+    return `Error: Invalid expression - ${e instanceof Error ? e.message : String(e)}`;
+  }
+}
+
+async function computeHash(
+  root: string, 
+  input: string, 
+  algorithm: "md5" | "sha1" | "sha256" | "sha512",
+  isFile: boolean
+): Promise<string> {
+  const validAlgos = ["md5", "sha1", "sha256", "sha512"];
+  if (!validAlgos.includes(algorithm)) {
+    return `Error: Invalid algorithm. Use one of: ${validAlgos.join(", ")}`;
+  }
+
+  try {
+    let data: string | Buffer;
+    
+    if (isFile) {
+      const abs = assertInsideWorkspace(root, input);
+      data = await readFile(abs);
+    } else {
+      data = input;
+    }
+
+    const hash = createHash(algorithm).update(data).digest("hex");
+    return `${algorithm.toUpperCase()}: ${hash}`;
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    return `Error: ${msg}`;
+  }
+}
+
+function generateUUIDs(version: "v4" | "v7" | "nanoid", count: number, length: number): string {
+  const results: string[] = [];
+  
+  const nanoid = (len: number): string => {
+    const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789_-";
+    const bytes = randomBytes(len);
+    let id = "";
+    for (let i = 0; i < len; i++) {
+      id += alphabet[bytes[i] % alphabet.length];
+    }
+    return id;
+  };
+
+  const uuidv7 = (): string => {
+    // Simple v7-like implementation (time-sortable)
+    const timestamp = Date.now();
+    const bytes = randomBytes(10);
+    const hex = timestamp.toString(16).padStart(12, "0") + bytes.toString("hex").slice(0, 20);
+    return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-7${hex.slice(13, 16)}-${hex.slice(16, 20)}-${hex.slice(20, 32)}`;
+  };
+
+  for (let i = 0; i < count; i++) {
+    if (version === "v4") {
+      results.push(randomUUID());
+    } else if (version === "v7") {
+      results.push(uuidv7());
+    } else {
+      results.push(nanoid(Math.min(Math.max(length, 8), 64)));
+    }
+  }
+
+  return results.join("\n");
+}
+
+function formatDateTime(format: string, timezone: string, timestamp?: number): string {
+  const date = timestamp ? new Date(timestamp) : new Date();
+  
+  // Handle timezone if specified
+  let targetDate = date;
+  if (timezone) {
+    try {
+      const tzString = date.toLocaleString("en-US", { timeZone: timezone });
+      targetDate = new Date(tzString);
+    } catch {
+      return `Error: Invalid timezone "${timezone}"`;
+    }
+  }
+
+  switch (format.toLowerCase()) {
+    case "iso":
+      return targetDate.toISOString();
+    case "locale":
+      return targetDate.toLocaleString();
+    case "date":
+      return targetDate.toLocaleDateString();
+    case "time":
+      return targetDate.toLocaleTimeString();
+    case "full":
+      return targetDate.toString();
+    case "unix":
+      return String(Math.floor(date.getTime() / 1000));
+    case "timestamp":
+      return String(date.getTime());
+    default:
+      // Try to use as Intl.DateTimeFormat options or return ISO
+      try {
+        return new Intl.DateTimeFormat("en-US", { 
+          dateStyle: "full", 
+          timeStyle: "long",
+          timeZone: timezone || undefined 
+        }).format(targetDate);
+      } catch {
+        return targetDate.toISOString();
+      }
+  }
+}
+
+function getEnvInfo(detail: "basic" | "full"): string {
+  const parts: string[] = [];
+  
+  parts.push("🖥️  Environment Information");
+  parts.push("═".repeat(40));
+  
+  // Node.js info
+  parts.push(`Node.js: ${process.version}`);
+  parts.push(`Runtime: ${process.execPath}`);
+  
+  // OS info
+  parts.push(`Platform: ${platform()} (${release()})`);
+  parts.push(`Architecture: ${arch()}`);
+  
+  // Memory
+  const usedMB = Math.round((totalmem() - freemem()) / 1024 / 1024);
+  const totalMB = Math.round(totalmem() / 1024 / 1024);
+  parts.push(`Memory: ${usedMB}MB used / ${totalMB}MB total`);
+  
+  if (detail === "full") {
+    parts.push("");
+    parts.push("🔧 Detailed Information:");
+    parts.push(`- CPUs: ${cpus().length} cores (${cpus()[0]?.model ?? "unknown"})`);
+    parts.push(`- Uptime: ${Math.floor(process.uptime())} seconds`);
+    parts.push(`- PID: ${process.pid}`);
+    parts.push(`- PPID: ${process.ppid}`);
+    
+    parts.push("");
+    parts.push("📊 Resource Usage:");
+    const usage = process.resourceUsage?.() || process.cpuUsage?.();
+    if (usage) {
+      parts.push(`- User CPU: ${JSON.stringify(usage)}`);
+    }
+    
+    parts.push("");
+    parts.push("🔒 Security:");
+    parts.push(`- UID: ${process.getuid?.() ?? "N/A"}`);
+    parts.push(`- GID: ${process.getgid?.() ?? "N/A"}`);
+    
+    parts.push("");
+    parts.push("🌐 Network:");
+    parts.push(`- Node version: ${process.versions.node}`);
+    parts.push(`- V8 version: ${process.versions.v8}`);
+    parts.push(`- OpenSSL: ${process.versions.openssl}`);
+    parts.push(`- LibUV: ${process.versions.uv}`);
+    parts.push(`- zlib: ${process.versions.zlib}`);
+  }
+  
+  return parts.join("\n");
 }
 
 // ===== Shell Execution =====

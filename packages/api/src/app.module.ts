@@ -9,6 +9,8 @@ import { NanobotConfigService } from "./config/nanobot-config.service";
 import { HealthController } from "./health/health.controller";
 import { StatusController } from "./status/status.controller";
 import { WeixinLoginController } from "./weixin/weixin-login.controller";
+import { SkillsController } from "./skills/skills.controller";
+import { SkillsService } from "./skills/skills.service";
 
 const adminDist = join(__dirname, "..", "..", "admin", "dist-web");
 
@@ -26,7 +28,14 @@ const serveAdminUi =
         }),
       ]
     : [],
-  controllers: [HealthController, StatusController, ConfigController, ChatController, WeixinLoginController],
-  providers: [NanobotConfigService, ChatService],
+  controllers: [
+    HealthController,
+    StatusController,
+    ConfigController,
+    ChatController,
+    WeixinLoginController,
+    SkillsController,
+  ],
+  providers: [NanobotConfigService, ChatService, SkillsService],
 })
 export class AppModule {}

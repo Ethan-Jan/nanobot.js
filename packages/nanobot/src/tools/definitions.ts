@@ -119,6 +119,246 @@ export function toolDefinitions(allowShell: boolean, allowWrite = true): OpenAI.
         },
       },
     },
+    // ===== Utility Tools =====
+    {
+      type: "function",
+      function: {
+        name: "calculate",
+        description: "Evaluate a mathematical expression. Supports basic math (+, -, *, /, %, **), bitwise operations, and common functions (abs, round, floor, ceil, sqrt, min, max, sin, cos, tan, log, exp).",
+        parameters: {
+          type: "object",
+          properties: {
+            expression: { 
+              type: "string", 
+              description: "Mathematical expression to evaluate, e.g., '2 + 2 * 3', 'sqrt(16)', 'max(1, 5, 3)'" 
+            },
+          },
+          required: ["expression"],
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "hash",
+        description: "Calculate hash of a string or file. Supported algorithms: md5, sha1, sha256, sha512.",
+        parameters: {
+          type: "object",
+          properties: {
+            input: { 
+              type: "string", 
+              description: "String to hash, or file path (relative to workspace) if is_file is true" 
+            },
+            algorithm: { 
+              type: "string", 
+              enum: ["md5", "sha1", "sha256", "sha512"],
+              description: "Hash algorithm to use (default: sha256)" 
+            },
+            is_file: {
+              type: "boolean",
+              description: "If true, treat input as a file path instead of string",
+            },
+          },
+          required: ["input"],
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "uuid",
+        description: "Generate UUIDs or random strings. Useful for creating unique identifiers.",
+        parameters: {
+          type: "object",
+          properties: {
+            version: { 
+              type: "string", 
+              enum: ["v4", "v7", "nanoid"],
+              description: "UUID version: v4 (random), v7 (time-sortable), nanoid (URL-friendly)" 
+            },
+            count: {
+              type: "number",
+              description: "Number of UUIDs to generate (default: 1, max: 10)",
+            },
+            length: {
+              type: "number",
+              description: "For nanoid: length of the ID (default: 21)",
+            },
+          },
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "datetime",
+        description: "Get current date and time information, or format a timestamp. Supports multiple timezones.",
+        parameters: {
+          type: "object",
+          properties: {
+            format: { 
+              type: "string", 
+              description: "Output format: 'iso', 'locale', 'date', 'time', 'full', or custom strftime format (default: iso)" 
+            },
+            timezone: { 
+              type: "string", 
+              description: "Timezone, e.g., 'UTC', 'America/New_York', 'Asia/Shanghai' (default: local)" 
+            },
+            timestamp: {
+              type: "number",
+              description: "Unix timestamp to format (ms). If omitted, uses current time.",
+            },
+          },
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "env_info",
+        description: "Get environment information: Node.js version, OS platform, CPU architecture, available memory, etc.",
+        parameters: {
+          type: "object",
+          properties: {
+            detail: { 
+              type: "string", 
+              enum: ["basic", "full"],
+              description: "Level of detail: 'basic' (default) or 'full' for more system info" 
+            },
+          },
+        },
+      },
+    },
+    // ===== Todo Management Tools =====
+    {
+      type: "function",
+      function: {
+        name: "todo_add",
+        description: "Add a new todo task to the workspace todo list.",
+        parameters: {
+          type: "object",
+          properties: {
+            title: { 
+              type: "string", 
+              description: "Title of the todo task (required)" 
+            },
+            description: { 
+              type: "string", 
+              description: "Optional detailed description" 
+            },
+            priority: { 
+              type: "string", 
+              enum: ["low", "medium", "high"],
+              description: "Priority level (default: medium)" 
+            },
+            tags: {
+              type: "array",
+              items: { type: "string" },
+              description: "Optional tags for categorization",
+            },
+            dueAt: {
+              type: "number",
+              description: "Optional due date as Unix timestamp (milliseconds)",
+            },
+          },
+          required: ["title"],
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "todo_list",
+        description: "List todos with optional filtering by status, priority, or tag.",
+        parameters: {
+          type: "object",
+          properties: {
+            status: { 
+              type: "string", 
+              enum: ["pending", "in_progress", "done", "all"],
+              description: "Filter by status (default: all)" 
+            },
+            priority: { 
+              type: "string", 
+              enum: ["low", "medium", "high"],
+              description: "Filter by priority" 
+            },
+            tag: {
+              type: "string",
+              description: "Filter by tag name",
+            },
+          },
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "todo_update",
+        description: "Update an existing todo by ID. Can change status, priority, title, description, or tags.",
+        parameters: {
+          type: "object",
+          properties: {
+            id: { 
+              type: "string", 
+              description: "Todo ID or prefix (required)" 
+            },
+            title: { 
+              type: "string", 
+              description: "New title" 
+            },
+            description: { 
+              type: "string", 
+              description: "New description" 
+            },
+            status: { 
+              type: "string", 
+              enum: ["pending", "in_progress", "done"],
+              description: "New status" 
+            },
+            priority: { 
+              type: "string", 
+              enum: ["low", "medium", "high"],
+              description: "New priority" 
+            },
+            tags: {
+              type: "array",
+              items: { type: "string" },
+              description: "New tags (replaces existing)",
+            },
+          },
+          required: ["id"],
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "todo_delete",
+        description: "Delete a todo by ID.",
+        parameters: {
+          type: "object",
+          properties: {
+            id: { 
+              type: "string", 
+              description: "Todo ID or prefix (required)" 
+            },
+          },
+          required: ["id"],
+        },
+      },
+    },
+    {
+      type: "function",
+      function: {
+        name: "todo_stats",
+        description: "Get statistics about todos: total count, completion rate, by status and priority.",
+        parameters: {
+          type: "object",
+          properties: {},
+        },
+      },
+    },
   ];
 
   if (allowWrite) {

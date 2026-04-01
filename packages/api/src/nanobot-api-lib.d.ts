@@ -34,4 +34,44 @@ declare module "nanobot/api-lib" {
     | { status: "waiting" | "scaned" | "expired" }
     | { status: "confirmed"; saved: true }
   >;
+
+  // ===== 技能系统 =====
+  export interface SkillManifest {
+    name: string;
+    description?: string;
+    version?: string;
+    triggers?: string[];
+  }
+
+  export interface SkillDetail extends SkillManifest {
+    readme?: string;
+    author?: string;
+    license?: string;
+    source: "local" | "github";
+    sourceUrl?: string;
+  }
+
+  export interface GitHubSkillInfo {
+    fullName: string;
+    url: string;
+    description?: string;
+    stars: number;
+  }
+
+  export function loadAllSkills(workspaceRoot: string): Promise<SkillManifest[]>;
+  export function loadSkillPromptFragments(workspaceRoot: string): Promise<string[]>;
+  export function getCodeAnalysisReport(workspaceRoot: string): Promise<string>;
+  export function listAvailableSkills(workspaceRoot: string): Promise<string>;
+
+  export function importSkillFromGitHub(
+    url: string,
+    workspaceRoot: string
+  ): Promise<SkillDetail>;
+  export function deleteSkill(name: string, workspaceRoot: string): Promise<void>;
+  export function getSkillDetail(name: string, workspaceRoot: string): Promise<SkillDetail>;
+  export function searchGitHubSkills(
+    query: string,
+    opts?: { topicOnly?: boolean },
+  ): Promise<GitHubSkillInfo[]>;
+  export function getAllSkillsWithMetadata(workspaceRoot: string): Promise<SkillDetail[]>;
 }
