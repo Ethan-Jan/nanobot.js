@@ -1,0 +1,23 @@
+{
+  "version": 1,
+  "updatedAt": "2026-04-01T00:00:00.000Z",
+  "profile": {
+    "summary": "示例：在此写一段自然语言自我介绍，便于助手个人化协作。",
+    "role": "开发",
+    "domain": "示例领域",
+    "techStack": ["TypeScript", "Node.js"],
+    "timezoneOrSchedule": "东八区",
+    "notes": ""
+  },
+  "intent": {
+    "summary": "当前最想推进的一件事（可随进度在管理端「用户画像」里更新）。",
+    "shortTerm": "短期子目标（选填）",
+    "updatedAt": "2026-04-01T00:00:00.000Z"
+  },
+  "preferences": {
+    "responseLanguage": "zh",
+    "detailLevel": "normal",
+    "codeAndDocsStyle": "与仓库现有风格一致",
+    "extra": ""
+  }
+}

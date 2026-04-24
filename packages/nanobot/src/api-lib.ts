@@ -4,6 +4,15 @@
 export { configPath, loadConfig, mergeAndSave, type NanobotConfig } from "./config.js";
 export { runAgentWithHistory, type AgentChatHistoryItem } from "./agent.js";
 export {
+  loadUserContext,
+  saveUserContext,
+  emptyUserContextForEditor,
+  type UserContextData,
+  type UserProfile,
+  type UserIntent,
+  type UserPreferences,
+} from "./nanobot/user/userContext.js";
+export {
   weixinHasPersistedToken,
   startWeixinQrSession,
   pollWeixinQrAndMaybeSave,

@@ -4,7 +4,8 @@ export type { WeixinQrStartResponse, WeixinLoginPollResponse } from "./weixinLog
 export { postWeixinLoginQr, getWeixinLoginPoll } from "./weixinLogin";
 export { getConfig, putConfig } from "./configApi";
 export type { ChatTurn } from "./chat";
-export { postChat } from "./chat";
+export { postChat, postChatStream } from "./chat";
+export { getUserContext, putUserContext } from "./userContextApi";
 export {
   getSkills,
   getSkillDetail,

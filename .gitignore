@@ -1,4 +1,6 @@
 .nanobot-runtime
+# 本地密钥；从 .env.example / nanobot.config.json.example 复制后填写
+.env
 # 本地 API Key 与通道密钥；从 nanobot.config.json.example 复制后填写
 nanobot.config.json
 node_modules

@@ -10,6 +10,7 @@ import { join } from "node:path";
 import type { MemoryConfig, NanobotConfig } from "../../config.js";
 import { repoRoot } from "../../config.js";
 import { loadSkillPromptFragments } from "../skills/skillsLoader.js";
+import { formatUserContextForPrompt, loadUserContext } from "../user/userContext.js";
 
 export interface MemoryBlock {
   title: string;
@@ -209,7 +210,7 @@ function buildCoreSystemBlock(displayName: string): string {
 
 回答尽量简短；需要时给出代码。若工具调用失败，说明原因并给出可行修复建议。
 
-（系统可能附带「长期备忘 MEMORY.md」与「近期已持久化对话」摘要，请当作上下文参考。）`;
+（系统可能附带「用户画像与偏好」「长期备忘 MEMORY.md」与「近期已持久化对话」摘要，请当作上下文参考；个人化时以前两者与本轮用户输入为准。）`;
 }
 
 const ASK_NICKNAME_GUIDE = `
@@ -242,16 +243,12 @@ export async function buildMemorySystemSuffix(
   sessionKey: string,
 ): Promise<string> {
   if (!isMemoryEnabled(cfg)) return "";
-  
+
   const blocks = await loadMemoryBlocks(workspaceRoot);
   const tr = await loadTranscript(sessionKey);
   const skills = await loadSkillPromptFragments(workspaceRoot);
-  
-  const parts = [
-    formatSkills(skills),
-    formatBlocks(blocks), 
-    formatTranscript(tr)
-  ].filter(Boolean);
+
+  const parts = [formatSkills(skills), formatBlocks(blocks), formatTranscript(tr)].filter(Boolean);
   
   if (!parts.length) return "";
   return parts.join("\n\n---\n\n");
@@ -267,7 +264,9 @@ export async function buildFullSystemPrompt(
   if (await shouldAppendAskNicknameGuide(cfg, sessionKey)) {
     base += ASK_NICKNAME_GUIDE;
   }
-  const suffix = await buildMemorySystemSuffix(cfg, workspaceRoot, sessionKey);
-  if (!suffix) return base;
-  return `${base}\n\n---\n\n${suffix}`;
+  const userContextBlock = formatUserContextForPrompt(await loadUserContext(workspaceRoot));
+  const memSuffix = await buildMemorySystemSuffix(cfg, workspaceRoot, sessionKey);
+  const add = [userContextBlock, memSuffix].filter(Boolean);
+  if (!add.length) return base;
+  return `${base}\n\n---\n\n${add.join("\n\n---\n\n")}`;
 }

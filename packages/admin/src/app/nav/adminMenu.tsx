@@ -4,6 +4,7 @@ import {
   CloudServerOutlined,
   CommentOutlined,
   DashboardOutlined,
+  IdcardOutlined,
   SettingOutlined,
   ThunderboltOutlined,
 } from "@ant-design/icons";
@@ -20,6 +21,7 @@ export function getAdminSiderMenuItems(): MenuProps["items"] {
       label: "管理",
       children: [
         { key: "skills", icon: <ThunderboltOutlined />, label: "技能管理" },
+        { key: "user-context", icon: <IdcardOutlined />, label: "用户画像" },
         { key: "providers", icon: <CloudServerOutlined />, label: "模型与供应商" },
         { key: "mcp", icon: <ApiOutlined />, label: "MCP 服务" },
         { key: "config", icon: <SettingOutlined />, label: "高级配置" },

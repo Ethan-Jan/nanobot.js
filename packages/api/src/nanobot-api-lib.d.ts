@@ -15,11 +15,50 @@ declare module "nanobot/api-lib" {
   export function loadConfig(): Promise<NanobotConfig>;
   export function configPath(): string;
   export function mergeAndSave(patch: Partial<NanobotConfig>): Promise<NanobotConfig>;
+
+  export type UserProfile = {
+    summary?: string;
+    role?: string;
+    domain?: string;
+    techStack?: string[];
+    timezoneOrSchedule?: string;
+    notes?: string;
+  };
+  export type UserIntent = {
+    summary?: string;
+    shortTerm?: string;
+    updatedAt?: string;
+  };
+  export type UserPreferences = {
+    responseLanguage?: string;
+    detailLevel?: "brief" | "normal" | "detailed";
+    codeAndDocsStyle?: string;
+    extra?: string;
+  };
+  export type UserContextData = {
+    version: 1;
+    updatedAt: string;
+    profile?: UserProfile;
+    intent?: UserIntent;
+    preferences?: UserPreferences;
+  };
+
+  export function loadUserContext(workspaceRoot: string): Promise<UserContextData | null>;
+  export function saveUserContext(workspaceRoot: string, data: UserContextData): Promise<void>;
+  export function emptyUserContextForEditor(): UserContextData;
+
+  export type AgentChatHistoryItem = { role: "user" | "assistant"; content: string };
+
   export function runAgentWithHistory(
     cfg: NanobotConfig,
-    prior: { role: "user" | "assistant"; content: string }[],
+    prior: AgentChatHistoryItem[],
     userMessage: string,
-    opts?: { sessionKey?: string; allowShell?: boolean },
+    opts?: {
+      sessionKey?: string;
+      allowShell?: boolean;
+      workspaceRoot?: string;
+      onStreamDelta?: (text: string) => void;
+    },
   ): Promise<string>;
 
   export function weixinHasPersistedToken(cfg: NanobotConfig): Promise<boolean>;

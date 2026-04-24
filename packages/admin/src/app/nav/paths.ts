@@ -1,4 +1,4 @@
-export type MenuKey = "dashboard" | "chat" | "skills" | "providers" | "config" | "mcp";
+export type MenuKey = "dashboard" | "chat" | "skills" | "providers" | "config" | "mcp" | "user-context";
 
 export const ADMIN_PAGE_TITLES: Record<MenuKey, string> = {
   dashboard: "概览",
@@ -7,6 +7,7 @@ export const ADMIN_PAGE_TITLES: Record<MenuKey, string> = {
   providers: "模型与供应商",
   config: "高级配置",
   mcp: "MCP 服务",
+  "user-context": "用户画像",
 };
 
 export const PATH_BY_MENU: Record<MenuKey, string> = {
@@ -16,13 +17,21 @@ export const PATH_BY_MENU: Record<MenuKey, string> = {
   providers: "/providers",
   config: "/config",
   mcp: "/mcp",
+  "user-context": "/user-context",
 };
 
 export function menuKeyFromPath(pathname: string): MenuKey {
   const p = pathname.replace(/\/$/, "") || "/";
   if (p === "/" || p === "/dashboard") return "dashboard";
   const seg = p.slice(1);
-  if (seg === "chat" || seg === "skills" || seg === "providers" || seg === "config" || seg === "mcp") {
+  if (
+    seg === "chat" ||
+    seg === "skills" ||
+    seg === "providers" ||
+    seg === "config" ||
+    seg === "mcp" ||
+    seg === "user-context"
+  ) {
     return seg;
   }
   return "dashboard";
@@ -31,7 +40,7 @@ export function menuKeyFromPath(pathname: string): MenuKey {
 /** 侧栏「管理」子菜单的 key（非路由，仅用于 SubMenu） */
 export const ADMIN_SUBMENU_MANAGE_KEY = "manage";
 
-export const MENU_KEYS_UNDER_MANAGE: MenuKey[] = ["skills", "providers", "config", "mcp"];
+export const MENU_KEYS_UNDER_MANAGE: MenuKey[] = ["skills", "user-context", "providers", "config", "mcp"];
 
 /** 仅叶子菜单项可导航；SubMenu 的 key 无路径 */
 export function pathForMenuKey(key: string): string | undefined {

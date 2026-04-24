@@ -67,7 +67,10 @@ export function ChatMessagePanel({
             </div>
           </div>
         ))}
-        {loading ? (
+        {loading &&
+        turns.length > 0 &&
+        turns[turns.length - 1]?.role === "assistant" &&
+        !turns[turns.length - 1]?.content ? (
           <div style={{ textAlign: "center", padding: 16 }}>
             <Spin size="medium" tip="模型思考中…" />
           </div>

@@ -6,6 +6,7 @@ import { DashboardPage } from "@/features/dashboard/DashboardPage";
 import { ProvidersPage } from "@/features/providers/ProvidersPage";
 import { SkillsPage } from "@/features/skills/SkillsPage";
 import { McpPage } from "@/features/mcp/McpPage";
+import { UserContextPage } from "@/features/userContext/UserContextPage";
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
         <Route path="skills" element={<SkillsPage />} />
         <Route path="providers" element={<ProvidersPage />} />
         <Route path="mcp" element={<McpPage />} />
+        <Route path="user-context" element={<UserContextPage />} />
         <Route path="config" element={<ConfigPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

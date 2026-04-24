@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { App } from "antd";
-import { postChat, type ChatTurn } from "@/shared/api";
+import { postChatStream, type ChatTurn } from "@/shared/api";
 import {
   deriveThreadTitle,
   loadThreadsFromStorage,
@@ -113,27 +113,38 @@ export function useChatWorkspace() {
     }));
     setDraft("");
     setLoading(true);
+    const withAssistant = [...nextMessages, { role: "assistant" as const, content: "" }];
+    setThreads((prev) =>
+      prev.map((t) =>
+        t.id === activeId
+          ? { ...t, turns: withAssistant, updatedAt: Date.now() }
+          : t,
+      ),
+    );
+    let acc = "";
     try {
-      const reply = await postChat(nextMessages, activeId);
-      setThreads((prev) =>
-        prev.map((t) =>
-          t.id === activeId
-            ? {
-                ...t,
-                turns: [...nextMessages, { role: "assistant", content: reply }],
-                title:
-                  t.title === "新对话"
-                    ? deriveThreadTitle([...nextMessages, { role: "assistant", content: reply }])
-                    : t.title,
-                updatedAt: Date.now(),
-              }
-            : t,
-        ),
-      );
+      await postChatStream(nextMessages, activeId, (chunk) => {
+        acc += chunk;
+        setThreads((prev) =>
+          prev.map((t) => {
+            if (t.id !== activeId) return t;
+            const u = [...t.turns];
+            if (u.length === 0) return t;
+            u[u.length - 1] = { role: "assistant", content: acc };
+            return {
+              ...t,
+              turns: u,
+              title:
+                t.title === "新对话" ? deriveThreadTitle([...nextMessages, { role: "assistant", content: acc }]) : t.title,
+              updatedAt: Date.now(),
+            };
+          }),
+        );
+      });
     } catch (e) {
       message.error(e instanceof Error ? e.message : String(e));
       setThreads((prev) =>
-        prev.map((t) => (t.id === activeId ? { ...t, turns: t.turns.slice(0, -1) } : t)),
+        prev.map((t) => (t.id === activeId ? { ...t, turns: t.turns.slice(0, -2) } : t)),
       );
     } finally {
       setLoading(false);

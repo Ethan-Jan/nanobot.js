@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "updatedAt": "2026-04-24T08:54:55.635Z",
+  "profile": {},
+  "intent": {
+    "updatedAt": "2026-04-24T08:54:55.612Z"
+  },
+  "preferences": {
+    "responseLanguage": "zh",
+    "detailLevel": "brief"
+  }
+}

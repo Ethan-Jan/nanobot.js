@@ -30,7 +30,18 @@ export default defineConfig({
     host: true,
     port: 5173,
     proxy: {
-      "/api": { target: "http://127.0.0.1:18791", changeOrigin: true },
+      "/api": {
+        target: "http://127.0.0.1:18791",
+        changeOrigin: true,
+        /** 避免开发代理缓冲 SSE，导致管理端对话不能边收边显示 */
+        configure(proxy) {
+          proxy.on("proxyRes", (proxyRes) => {
+            if (String(proxyRes.headers["content-type"] ?? "").includes("text/event-stream")) {
+              delete proxyRes.headers["content-length"];
+            }
+          });
+        },
+      },
     },
   },
 });

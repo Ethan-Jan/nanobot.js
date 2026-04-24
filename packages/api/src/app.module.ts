@@ -11,6 +11,7 @@ import { StatusController } from "./status/status.controller";
 import { WeixinLoginController } from "./weixin/weixin-login.controller";
 import { SkillsController } from "./skills/skills.controller";
 import { SkillsService } from "./skills/skills.service";
+import { UserContextController } from "./user-context/user-context.controller";
 
 const adminDist = join(__dirname, "..", "..", "admin", "dist-web");
 
@@ -35,6 +36,7 @@ const serveAdminUi =
     ChatController,
     WeixinLoginController,
     SkillsController,
+    UserContextController,
   ],
   providers: [NanobotConfigService, ChatService, SkillsService],
 })

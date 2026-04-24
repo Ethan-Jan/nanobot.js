@@ -39,6 +39,11 @@ export interface AgentRunOptions {
    * 当前：仅用于 /status 展示与后续多会话扩展
    */
   sessionKey?: string;
+  /**
+   * 若设置，则对模型补全使用流式 API，并按 token/片段多次回调（用于管理端 SSE）。
+   * 与 runAgentWithHistory 内部累积 `out` 的回调并行触发。
+   */
+  onStreamDelta?: (text: string) => void;
 }
 
 function resolveWorkspace(cfg: NanobotConfig, opts?: AgentRunOptions): string {
@@ -74,9 +79,39 @@ async function prepareAgentTools(
   };
 }
 
+type ToolCallAcc = { id: string; name: string; arguments: string };
+
+function mergeStreamToolCalls(
+  acc: Map<number, { id: string; name: string; arguments: string }>,
+  delta: { tool_calls?: Array<{ index: number; id?: string; function?: { name?: string; arguments?: string } }> },
+): void {
+  if (!delta.tool_calls?.length) return;
+  for (const tc of delta.tool_calls) {
+    const i = tc.index;
+    if (!acc.has(i)) {
+      acc.set(i, { id: "", name: "", arguments: "" });
+    }
+    const t = acc.get(i)!;
+    if (tc.id) t.id = tc.id;
+    if (tc.function?.name) t.name = tc.function.name;
+    if (tc.function?.arguments) t.arguments += tc.function.arguments;
+  }
+}
+
+function accToToolCallArray(acc: Map<number, ToolCallAcc>): OpenAI.Chat.ChatCompletionMessageToolCall[] {
+  return [...acc.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([, t]) => ({
+      id: t.id,
+      type: "function" as const,
+      function: { name: t.name, arguments: t.arguments },
+    }));
+}
+
 /**
  * 执行一轮「模型 + 工具」循环，直到模型不再调用工具或达到轮数上限。
  * 与上游 AgentLoop 的核心相似，但无 memory / channel / hook 等外围逻辑。
+ * @param useStream 为 true 时使用流式补全，并对可显示的文本分片多次调用 onAssistantText。
  */
 async function runModelToolRounds(
   client: OpenAI,
@@ -86,20 +121,77 @@ async function runModelToolRounds(
   policy: ToolPolicy,
   onAssistantText: (text: string) => void,
   diag: { providerName: string; baseURL: string },
+  useStream: boolean,
 ): Promise<void> {
   let turnComplete = false;
   for (let round = 0; round < MAX_MODEL_ROUNDS; round++) {
+    /** Kimi 部分模型（如 kimi-k2.5）仅允许 temperature=1，否则 400 */
+    const temperature = diag.providerName === "moonshot" ? 1 : 0.2;
+
+    const baseParams = {
+      model,
+      messages,
+      tools: tools.length ? tools : undefined,
+      tool_choice: tools.length ? "auto" as const : undefined,
+      temperature,
+    };
+
+    if (useStream) {
+      let stream: AsyncIterable<OpenAI.Chat.ChatCompletionChunk>;
+      try {
+        stream = (await client.chat.completions.create({ ...baseParams, stream: true })) as AsyncIterable<OpenAI.Chat.ChatCompletionChunk>;
+      } catch (e) {
+        onAssistantText(
+          "\n" +
+            explainChatApiError(e, {
+              providerName: diag.providerName,
+              model,
+              baseURL: diag.baseURL,
+            }) +
+            "\n",
+        );
+        turnComplete = true;
+        break;
+      }
+      const acc: Map<number, ToolCallAcc> = new Map();
+      let textBuf = "";
+      for await (const chunk of stream) {
+        const delta = chunk.choices[0]?.delta;
+        if (delta?.content) {
+          textBuf += delta.content;
+          onAssistantText(delta.content);
+        }
+        if (delta) mergeStreamToolCalls(acc, delta);
+      }
+      const toolCalls = accToToolCallArray(acc);
+      if (toolCalls.length) {
+        messages.push({ role: "assistant", content: textBuf || null, tool_calls: toolCalls });
+        for (const call of toolCalls) {
+          if (call.type !== "function") continue;
+          const fn = call.function;
+          let args: unknown = {};
+          try {
+            args = fn.arguments ? JSON.parse(fn.arguments) : {};
+          } catch {
+            args = {};
+          }
+          const result = await runTool(fn.name, args, policy);
+          messages.push({ role: "tool", tool_call_id: call.id, content: result });
+        }
+        continue;
+      }
+      if (!textBuf.trim() && !toolCalls.length) {
+        messages.push({ role: "assistant", content: "(no response)" });
+      } else {
+        messages.push({ role: "assistant", content: textBuf || "" });
+      }
+      turnComplete = true;
+      break;
+    }
+
     let completion: OpenAI.Chat.ChatCompletion;
     try {
-      /** Kimi 部分模型（如 kimi-k2.5）仅允许 temperature=1，否则 400 */
-      const temperature = diag.providerName === "moonshot" ? 1 : 0.2;
-      completion = await client.chat.completions.create({
-        model,
-        messages,
-        tools: tools.length ? tools : undefined,
-        tool_choice: tools.length ? "auto" : undefined,
-        temperature,
-      });
+      completion = await client.chat.completions.create(baseParams);
     } catch (e) {
       onAssistantText(
         "\n" +
@@ -181,8 +273,10 @@ export async function runAgentMessage(
       policy,
       (t) => {
         out += t;
+        opts?.onStreamDelta?.(t);
       },
       { providerName, baseURL },
+      Boolean(opts?.onStreamDelta),
     );
   } finally {
     await closeMcp();
@@ -226,8 +320,10 @@ export async function runAgentWithHistory(
       policy,
       (t) => {
         out += t;
+        opts?.onStreamDelta?.(t);
       },
       { providerName, baseURL },
+      Boolean(opts?.onStreamDelta),
     );
   } finally {
     await closeMcp();
@@ -299,10 +395,16 @@ export async function runAgentLoop(cfg: NanobotConfig, opts?: AgentRunOptions): 
         messages[0] = { role: "system", content: freshSystem };
         messages.push({ role: "user", content: user });
 
-        await runModelToolRounds(client, model, messages, tools, policy, (t) => output.write(`\n${t}\n`), {
-          providerName,
-          baseURL,
-        });
+        await runModelToolRounds(
+          client,
+          model,
+          messages,
+          tools,
+          policy,
+          (t) => output.write(`\n${t}\n`),
+          { providerName, baseURL },
+          false,
+        );
 
         const replyText = lastAssistantPlainText(messages);
         if (isMemoryEnabled(cfg) && replyText) {
