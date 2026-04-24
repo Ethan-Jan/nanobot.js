@@ -39,11 +39,15 @@ export interface AgentsConfig {
   askNicknameOnStart?: boolean;
 }
 
+/** 由 agent 注入：若返回非 undefined，则视为 MCP 工具结果 */
+export type McpToolDispatcher = (openAiToolName: string, args: unknown) => Promise<string | undefined>;
+
 export interface ToolPolicy {
   allowShell: boolean;
   workspaceRoot?: string;
   /** false 时禁止 write_file（读/搜/列仍可用）；默认 true */
   allowWrite?: boolean;
+  mcpDispatch?: McpToolDispatcher;
 }
 
 /**
@@ -68,11 +72,31 @@ export interface ChannelsConfig {
   weixin?: WeixinChannelConfig;
 }
 
+/**
+ * 单个 MCP Server（stdio）：由本进程拉起子进程，经 JSON-RPC 暴露 tools。
+ * 键名用于生成 OpenAI 工具名前缀 `mcp__<键>__<工具名>`，请使用字母数字与下划线。
+ */
+export interface McpServerConfig {
+  /** true 时跳过该条目 */
+  disabled?: boolean;
+  command: string;
+  args?: string[];
+  /** 与进程默认环境合并（见 @modelcontextprotocol/sdk getDefaultEnvironment） */
+  env?: Record<string, string>;
+  cwd?: string;
+}
+
+export interface McpConfig {
+  servers?: Record<string, McpServerConfig>;
+}
+
 export interface NanobotConfig {
   providers: Record<ProviderName, ProviderConfig>;
   agents: AgentsConfig;
   tools: ToolPolicy;
   channels?: ChannelsConfig;
+  /** Model Context Protocol：stdio 子进程，工具并入对话 function calling */
+  mcp?: McpConfig;
 }
 
 /** 仅在没有被磁盘上的 nanobot.config.json 覆盖时生效 */
@@ -171,6 +195,23 @@ export function defaultConfig(): NanobotConfig {
        */
       moonshot: {
         baseUrl: "https://api.moonshot.cn/v1",
+        apiKey: "",
+      },
+      /**
+       * 智谱 AI（GLM）OpenAI 兼容接口。
+       * 文档：https://docs.bigmodel.cn/cn/guide/develop/openai/introduction
+       * 密钥：https://open.bigmodel.cn → apiKey；模型名如 glm-4-flash、glm-4-plus 等以控制台为准
+       */
+      bigmodel: {
+        baseUrl: "https://open.bigmodel.cn/api/paas/v4/",
+        apiKey: "",
+      },
+      /**
+       * 智谱 AI（GLM）OpenAI 兼容接口，与 `bigmodel` 为同一平台；便于使用 `agents.defaults.provider: "zhipuai"`。
+       * 密钥与模型名同 bigmodel；环境变量见 `openai-compat.ts` 中 `zhipuai`。
+       */
+      zhipuai: {
+        baseUrl: "https://open.bigmodel.cn/api/paas/v4/",
         apiKey: "",
       },
     },
@@ -294,6 +335,9 @@ export async function mergeAndSave(patch: Partial<NanobotConfig>): Promise<Nanob
         weixin: { ...defaultConfig().channels!.weixin, ...base.channels.weixin },
       }
       : defaultConfig().channels,
+    ...(base.mcp?.servers && Object.keys(base.mcp.servers).length > 0
+      ? { mcp: { servers: { ...base.mcp.servers } } }
+      : {}),
   };
   if (patch.providers) {
     for (const [name, pc] of Object.entries(patch.providers)) {
@@ -324,6 +368,19 @@ export async function mergeAndSave(patch: Partial<NanobotConfig>): Promise<Nanob
   if (patch.channels?.weixin) {
     merged.channels = merged.channels ?? {};
     merged.channels.weixin = { ...merged.channels.weixin, ...patch.channels.weixin };
+  }
+  if (patch.mcp !== undefined) {
+    merged.mcp = {
+      ...(merged.mcp ?? {}),
+      ...patch.mcp,
+      ...(patch.mcp.servers !== undefined ? { servers: { ...patch.mcp.servers } } : {}),
+    };
+    if (merged.mcp.servers && Object.keys(merged.mcp.servers).length === 0) {
+      delete merged.mcp.servers;
+    }
+    if (merged.mcp && (!merged.mcp.servers || Object.keys(merged.mcp.servers).length === 0)) {
+      delete merged.mcp;
+    }
   }
   await saveConfig(merged);
   return merged;

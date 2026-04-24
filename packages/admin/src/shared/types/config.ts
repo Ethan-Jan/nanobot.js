@@ -32,4 +32,16 @@ export type NanobotConfigDTO = {
       poll_timeout?: number;
     };
   };
+  mcp?: {
+    servers?: Record<
+      string,
+      {
+        disabled?: boolean;
+        command: string;
+        args?: string[];
+        env?: Record<string, string>;
+        cwd?: string;
+      }
+    >;
+  };
 };

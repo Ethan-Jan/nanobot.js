@@ -12,6 +12,14 @@ const ENV_FOR: Record<string, string[]> = {
   openrouter: ["OPENROUTER_API_KEY", "NANOBOT_OPENROUTER_API_KEY"],
   openai: ["OPENAI_API_KEY", "NANOBOT_OPENAI_API_KEY"],
   moonshot: ["MOONSHOT_API_KEY", "KIMI_API_KEY", "NANOBOT_MOONSHOT_API_KEY"],
+  bigmodel: ["BIGMODEL_API_KEY", "ZHIPU_API_KEY", "NANOBOT_BIGMODEL_API_KEY"],
+  zhipuai: [
+    "ZHIPUAI_API_KEY",
+    "ZHIPU_API_KEY",
+    "BIGMODEL_API_KEY",
+    "NANOBOT_ZHIPUAI_API_KEY",
+    "NANOBOT_BIGMODEL_API_KEY",
+  ],
 };
 
 function hasEnvKey(providerId: string): boolean {
@@ -37,5 +45,17 @@ export function formatStatus(cfg: NanobotConfig): string {
     lines.push(`  ${id}: ${ready ? "ready (key in file and/or env)" : "missing key"}  baseUrl=${p.baseUrl ?? "(default)"}`);
   }
   lines.push("", "NANOBOT_API_KEY + NANOBOT_PROVIDER 组合可覆盖默认 provider（见 openai-compat.ts）。");
+
+  const mcpServers = cfg.mcp?.servers;
+  if (mcpServers && Object.keys(mcpServers).length > 0) {
+    lines.push("", "mcp (stdio servers):");
+    for (const [id, s] of Object.entries(mcpServers)) {
+      const on = !s.disabled && Boolean(s.command?.trim());
+      lines.push(
+        `  ${id}: ${on ? "enabled" : "disabled"}  command=${s.command ?? "(none)"}${s.args?.length ? ` args=${JSON.stringify(s.args)}` : ""}`,
+      );
+    }
+  }
+
   return lines.join("\n");
 }

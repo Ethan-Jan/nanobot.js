@@ -26,9 +26,9 @@ export function explainChatApiError(err: unknown, ctx: ChatDiagContext): string 
         `请逐项检查：`,
         `1) ${path} → providers.${ctx.providerName}.apiKey（或 .env：MOONSHOT_API_KEY / OPENROUTER_API_KEY 等）`,
         `2) Key 是否完整复制、前后无空格/引号；是否在对应平台重新生成过`,
-        `3) agents.defaults.provider 是否与 Key 匹配：moonshot 只能用 Kimi(Moonshot) 的 Key，不能用 OpenRouter`,
-        `4) agents.defaults.model 是否为该平台支持的 id（Kimi 一般为 kimi-k2.5 等，不要填 openai/gpt-4o-mini 这类 OpenRouter 名）`,
-        `5) Kimi：国内控制台生成的 Key 须配 providers.moonshot.baseUrl=https://api.moonshot.cn/v1；国际站用 https://api.moonshot.ai/v1（混用会 401）`,
+        `3) agents.defaults.provider 是否与 Key 匹配：moonshot 只能用 Kimi 的 Key；zhipuai/bigmodel 须用智谱开放平台 Key；不能与 OpenRouter 混用`,
+        `4) agents.defaults.model 是否为该平台支持的 id（Kimi：kimi-k2.5 等；智谱：glm-4-flash 等，勿填 openai/gpt-4o-mini 这类 OpenRouter 名）`,
+        `5) Kimi：国内 Key 须配 providers.moonshot.baseUrl=https://api.moonshot.cn/v1；国际站用 https://api.moonshot.ai/v1（混用会 401）`,
         ``,
         `可先运行：node dist/cli.js status`,
       ].join("\n");

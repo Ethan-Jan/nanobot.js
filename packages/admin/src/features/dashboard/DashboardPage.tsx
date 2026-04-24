@@ -1,7 +1,7 @@
 import { useCallback } from "react";
 import { Alert, Card, Col, Row, Typography } from "antd";
 import { PageSpinner } from "@/shared/ui/PageSpinner";
-import { AgentDefaultsCard } from "./components/AgentDefaultsCard";
+import { DefaultAiSettingsCard } from "./components/DefaultAiSettingsCard";
 import { ProvidersStatusCard } from "./components/ProvidersStatusCard";
 import { WeixinChannelDescriptions } from "./components/WeixinChannelDescriptions";
 import { WeixinLongPollHint } from "./components/WeixinLongPollHint";
@@ -54,10 +54,10 @@ export function DashboardPage() {
         运行概览
       </Typography.Title>
       <Row gutter={[16, 16]}>
-        <Col xs={24} lg={12}>
-          <AgentDefaultsCard data={data} />
+        <Col span={24}>
+          <DefaultAiSettingsCard data={data} onSaved={() => void refresh()} />
         </Col>
-        <Col xs={24} lg={12}>
+        <Col span={24}>
           <ProvidersStatusCard data={data} />
         </Col>
         <Col xs={24}>

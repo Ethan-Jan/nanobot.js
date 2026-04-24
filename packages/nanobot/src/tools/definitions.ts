@@ -1,6 +1,10 @@
 import type OpenAI from "openai";
 
-export function toolDefinitions(allowShell: boolean, allowWrite = true): OpenAI.Chat.ChatCompletionTool[] {
+export function toolDefinitions(
+  allowShell: boolean,
+  allowWrite = true,
+  extraTools: OpenAI.Chat.ChatCompletionTool[] = [],
+): OpenAI.Chat.ChatCompletionTool[] {
   const tools: OpenAI.Chat.ChatCompletionTool[] = [
     {
       type: "function",
@@ -398,5 +402,6 @@ export function toolDefinitions(allowShell: boolean, allowWrite = true): OpenAI.
     });
   }
 
+  if (extraTools.length) tools.push(...extraTools);
   return tools;
 }

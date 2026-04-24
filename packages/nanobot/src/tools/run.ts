@@ -55,7 +55,7 @@ export async function runTool(
 
   const allowWrite = policy.allowWrite !== false;
   try {
-    return await runToolInner(name, args, root, allowShell, allowWrite);
+    return await runToolInner(name, args, root, allowShell, allowWrite, policy);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return `Error: ${msg}`;
@@ -68,7 +68,13 @@ async function runToolInner(
   root: string,
   allowShell: boolean,
   allowWrite: boolean,
+  policy: ToolPolicy,
 ): Promise<string> {
+  if (policy.mcpDispatch) {
+    const mcpOut = await policy.mcpDispatch(name, args);
+    if (mcpOut !== undefined) return mcpOut;
+  }
+
   if (name === "read_file") {
     const path = String((args as { path?: string }).path ?? "");
     const abs = assertInsideWorkspace(root, path);

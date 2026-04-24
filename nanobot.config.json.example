@@ -1,0 +1,51 @@
+{
+  "providers": {
+    "openrouter": {
+      "baseUrl": "https://openrouter.ai/api/v1",
+      "apiKey": ""
+    },
+    "openai": {
+      "baseUrl": "https://api.openai.com/v1",
+      "apiKey": ""
+    },
+    "moonshot": {
+      "baseUrl": "https://api.moonshot.cn/v1",
+      "apiKey": ""
+    },
+    "bigmodel": {
+      "baseUrl": "https://open.bigmodel.cn/api/paas/v4/",
+      "apiKey": ""
+    },
+    "zhipuai": {
+      "baseUrl": "https://open.bigmodel.cn/api/paas/v4/",
+      "apiKey": ""
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": "kimi-k2.5",
+      "provider": "moonshot"
+    },
+    "memory": {
+      "enabled": true,
+      "maxPersistedMessages": 40
+    }
+  },
+  "tools": {
+    "allowShell": false,
+    "allowWrite": true,
+    "workspaceRoot": "."
+  },
+  "channels": {
+    "weixin": {
+      "enabled": false,
+      "allow_from": [],
+      "base_url": "https://ilinkai.weixin.qq.com",
+      "cdn_base_url": "https://novac2c.cdn.weixin.qq.com/c2c",
+      "route_tag": null,
+      "token": "",
+      "state_dir": "",
+      "poll_timeout": 35
+    }
+  }
+}

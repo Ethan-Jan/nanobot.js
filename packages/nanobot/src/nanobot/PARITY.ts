@@ -92,9 +92,9 @@ export const PARITY_MATRIX: readonly ParityEntry[] = [
   },
   {
     upstream: "agent/mcp.py + mcp SDK",
-    tsModule: "(未建独立文件)",
-    level: "stub",
-    notes: "需 @modelcontextprotocol/sdk 或自研 JSON-RPC 与 stdio/sse 传输",
+    tsModule: "nanobot/mcp/pool.ts + config.mcp.servers (stdio)",
+    level: "partial",
+    notes: "已接 @modelcontextprotocol/sdk：多 stdio server、listTools 分页、callTool；无 SSE/HTTP transport、无 resources/prompts 订阅",
   },
   {
     upstream: "agent/memory.py",

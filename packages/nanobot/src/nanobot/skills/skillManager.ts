@@ -96,7 +96,7 @@ export async function importSkillFromGitHub(
     
     // 保存元数据
     const metadata = {
-      source: "github",
+      source: "github" as const,
       sourceUrl: `https://github.com/${owner}/${repo}`,
       importedAt: new Date().toISOString(),
     };

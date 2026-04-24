@@ -1,6 +1,7 @@
 import readline from "node:readline/promises";
 import { stdin as input, stdout as output } from "node:process";
 import type OpenAI from "openai";
+import { McpPool } from "./nanobot/mcp/pool.js";
 import { createClient, effectiveChatModel } from "./providers/openai-compat.js";
 import { explainChatApiError } from "./providers/apiErrors.js";
 import type { NanobotConfig, ToolPolicy } from "./config.js";
@@ -44,6 +45,33 @@ function resolveWorkspace(cfg: NanobotConfig, opts?: AgentRunOptions): string {
   const fromEnv = process.env.NANOBOT_WORKSPACE?.trim();
   if (fromEnv) return fromEnv;
   return opts?.workspaceRoot ?? cfg.tools.workspaceRoot ?? process.cwd();
+}
+
+/** 连接配置的 MCP stdio servers，合并工具列表；务必在 finally 中调用 closeMcp */
+async function prepareAgentTools(
+  cfg: NanobotConfig,
+  opts?: AgentRunOptions,
+): Promise<{
+  tools: OpenAI.Chat.ChatCompletionTool[];
+  policy: ToolPolicy;
+  closeMcp: () => Promise<void>;
+}> {
+  const pool = await McpPool.connect(cfg);
+  const mcpTools = pool?.getOpenAiTools() ?? [];
+  const policy: ToolPolicy = {
+    allowShell: opts?.allowShell ?? cfg.tools.allowShell,
+    allowWrite: cfg.tools.allowWrite !== false,
+    workspaceRoot: resolveWorkspace(cfg, opts),
+    mcpDispatch: pool ? (name, args) => pool.dispatch(name, args) : undefined,
+  };
+  const tools = toolDefinitions(policy.allowShell ?? false, policy.allowWrite !== false, mcpTools);
+  return {
+    tools,
+    policy,
+    closeMcp: async () => {
+      await pool?.close();
+    },
+  };
 }
 
 /**
@@ -136,12 +164,7 @@ export async function runAgentMessage(
 ): Promise<string> {
   const { client, providerName, baseURL } = createClient(cfg);
   const model = effectiveChatModel(cfg, providerName);
-  const policy: ToolPolicy = {
-    allowShell: opts?.allowShell ?? cfg.tools.allowShell,
-    allowWrite: cfg.tools.allowWrite !== false,
-    workspaceRoot: resolveWorkspace(cfg, opts),
-  };
-  const tools = toolDefinitions(policy.allowShell ?? false, policy.allowWrite !== false);
+  const { tools, policy, closeMcp } = await prepareAgentTools(cfg, opts);
   const sessionKey = opts?.sessionKey ?? "cli:direct";
   const systemContent = await buildFullSystemPrompt(cfg, policy.workspaceRoot ?? process.cwd(), sessionKey);
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
@@ -149,17 +172,21 @@ export async function runAgentMessage(
     { role: "user", content: userMessage },
   ];
   let out = "";
-  await runModelToolRounds(
-    client,
-    model,
-    messages,
-    tools,
-    policy,
-    (t) => {
-      out += t;
-    },
-    { providerName, baseURL },
-  );
+  try {
+    await runModelToolRounds(
+      client,
+      model,
+      messages,
+      tools,
+      policy,
+      (t) => {
+        out += t;
+      },
+      { providerName, baseURL },
+    );
+  } finally {
+    await closeMcp();
+  }
   const replyText = lastAssistantPlainText(messages);
   if (isMemoryEnabled(cfg) && replyText) {
     await appendSessionTranscript(sessionKey, userMessage, replyText, memoryPersistLimit(cfg));
@@ -181,12 +208,7 @@ export async function runAgentWithHistory(
 ): Promise<string> {
   const { client, providerName, baseURL } = createClient(cfg);
   const model = effectiveChatModel(cfg, providerName);
-  const policy: ToolPolicy = {
-    allowShell: opts?.allowShell ?? cfg.tools.allowShell,
-    allowWrite: cfg.tools.allowWrite !== false,
-    workspaceRoot: resolveWorkspace(cfg, opts),
-  };
-  const tools = toolDefinitions(policy.allowShell ?? false, policy.allowWrite !== false);
+  const { tools, policy, closeMcp } = await prepareAgentTools(cfg, opts);
   const sessionKey = opts?.sessionKey ?? "admin:web";
   const systemContent = await buildFullSystemPrompt(cfg, policy.workspaceRoot ?? process.cwd(), sessionKey);
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [
@@ -195,17 +217,21 @@ export async function runAgentWithHistory(
     { role: "user", content: userMessage },
   ];
   let out = "";
-  await runModelToolRounds(
-    client,
-    model,
-    messages,
-    tools,
-    policy,
-    (t) => {
-      out += t;
-    },
-    { providerName, baseURL },
-  );
+  try {
+    await runModelToolRounds(
+      client,
+      model,
+      messages,
+      tools,
+      policy,
+      (t) => {
+        out += t;
+      },
+      { providerName, baseURL },
+    );
+  } finally {
+    await closeMcp();
+  }
   const replyText = lastAssistantPlainText(messages);
   if (isMemoryEnabled(cfg) && replyText) {
     await appendSessionTranscript(sessionKey, userMessage, replyText, memoryPersistLimit(cfg));
@@ -216,79 +242,78 @@ export async function runAgentWithHistory(
 export async function runAgentLoop(cfg: NanobotConfig, opts?: AgentRunOptions): Promise<void> {
   const { client, providerName, baseURL } = createClient(cfg);
   const model = effectiveChatModel(cfg, providerName);
-  const policy: ToolPolicy = {
-    allowShell: opts?.allowShell ?? cfg.tools.allowShell,
-    allowWrite: cfg.tools.allowWrite !== false,
-    workspaceRoot: resolveWorkspace(cfg, opts),
-  };
-  const tools = toolDefinitions(policy.allowShell ?? false, policy.allowWrite !== false);
-
-  const sessionKey = opts?.sessionKey ?? "cli:direct";
-  const workspace = policy.workspaceRoot ?? process.cwd();
-  const systemContent = await buildFullSystemPrompt(cfg, workspace, sessionKey);
-  const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [{ role: "system", content: systemContent }];
-
-  let weixinBridge: WeixinIlinkBridge | undefined;
-  const weixinParallel = cfg.channels?.weixin?.enabled === true;
-  if (weixinParallel) {
-    weixinBridge = new WeixinIlinkBridge(cfg);
-    void weixinBridge
-      .runLoop({ allowShell: opts?.allowShell === true, embedded: true })
-      .catch((e) => {
-        console.error(
-          "[weixin] 并联启动失败：",
-          e instanceof Error ? e.message : e,
-          "\n可先执行：node dist/cli.js channels weixin login",
-        );
-      });
-  }
-
-  const rl = readline.createInterface({ input, output });
-  output.write('nanobot — type "exit" or Ctrl+C or quit. Slash: /help /new /alias /memory /status\n');
-  output.write(`Workspace: ${policy.workspaceRoot}\n`);
-
-  const resetConversation = async (): Promise<void> => {
-    if (isMemoryEnabled(cfg)) await clearSessionMemory(sessionKey);
-    messages.length = 0;
-    const next = await buildFullSystemPrompt(cfg, workspace, sessionKey);
-    messages.push({ role: "system", content: next });
-  };
+  const { tools, policy, closeMcp } = await prepareAgentTools(cfg, opts);
 
   try {
-    for (;;) {
-      const user = (await rl.question("\n> ")).trim();
-      if (!user) continue;
+    const sessionKey = opts?.sessionKey ?? "cli:direct";
+    const workspace = policy.workspaceRoot ?? process.cwd();
+    const systemContent = await buildFullSystemPrompt(cfg, workspace, sessionKey);
+    const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [{ role: "system", content: systemContent }];
 
-      const slash = await handleSlashLine(
-        user,
-        {
-          configPath: configPath(),
-          sessionKey,
-          resetConversation,
-          workspaceRoot: policy.workspaceRoot ?? process.cwd(),
-          cfg,
-        },
-        (s) => output.write(s),
-      );
-      if (slash === "exit") break;
-      if (slash === "consumed") continue;
+    let weixinBridge: WeixinIlinkBridge | undefined;
+    const weixinParallel = cfg.channels?.weixin?.enabled === true;
+    if (weixinParallel) {
+      weixinBridge = new WeixinIlinkBridge(cfg);
+      void weixinBridge
+        .runLoop({ allowShell: opts?.allowShell === true, embedded: true })
+        .catch((e) => {
+          console.error(
+            "[weixin] 并联启动失败：",
+            e instanceof Error ? e.message : e,
+            "\n可先执行：node dist/cli.js channels weixin login",
+          );
+        });
+    }
 
-      const freshSystem = await buildFullSystemPrompt(cfg, workspace, sessionKey);
-      messages[0] = { role: "system", content: freshSystem };
-      messages.push({ role: "user", content: user });
+    const rl = readline.createInterface({ input, output });
+    output.write('nanobot — type "exit" or Ctrl+C or quit. Slash: /help /new /alias /memory /status\n');
+    output.write(`Workspace: ${policy.workspaceRoot}\n`);
 
-      await runModelToolRounds(client, model, messages, tools, policy, (t) => output.write(`\n${t}\n`), {
-        providerName,
-        baseURL,
-      });
+    const resetConversation = async (): Promise<void> => {
+      if (isMemoryEnabled(cfg)) await clearSessionMemory(sessionKey);
+      messages.length = 0;
+      const next = await buildFullSystemPrompt(cfg, workspace, sessionKey);
+      messages.push({ role: "system", content: next });
+    };
 
-      const replyText = lastAssistantPlainText(messages);
-      if (isMemoryEnabled(cfg) && replyText) {
-        await appendSessionTranscript(sessionKey, user, replyText, memoryPersistLimit(cfg));
+    try {
+      for (;;) {
+        const user = (await rl.question("\n> ")).trim();
+        if (!user) continue;
+
+        const slash = await handleSlashLine(
+          user,
+          {
+            configPath: configPath(),
+            sessionKey,
+            resetConversation,
+            workspaceRoot: policy.workspaceRoot ?? process.cwd(),
+            cfg,
+          },
+          (s) => output.write(s),
+        );
+        if (slash === "exit") break;
+        if (slash === "consumed") continue;
+
+        const freshSystem = await buildFullSystemPrompt(cfg, workspace, sessionKey);
+        messages[0] = { role: "system", content: freshSystem };
+        messages.push({ role: "user", content: user });
+
+        await runModelToolRounds(client, model, messages, tools, policy, (t) => output.write(`\n${t}\n`), {
+          providerName,
+          baseURL,
+        });
+
+        const replyText = lastAssistantPlainText(messages);
+        if (isMemoryEnabled(cfg) && replyText) {
+          await appendSessionTranscript(sessionKey, user, replyText, memoryPersistLimit(cfg));
+        }
       }
+    } finally {
+      weixinBridge?.stop();
+      rl.close();
     }
   } finally {
-    weixinBridge?.stop();
-    rl.close();
+    await closeMcp();
   }
 }

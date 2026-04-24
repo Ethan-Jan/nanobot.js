@@ -14,6 +14,7 @@
 - [一键：Web + 微信](#一键web--微信)
 - [管理端（Admin）](#管理端admin)
 - [Kimi / Moonshot 区域](#kimi--moonshot-区域与模型参数)
+- [智谱 AI（zhipuai）](#智谱-aizhipuai)
 - [环境变量](#环境变量摘要)
 - [CLI 命令](#cli-命令)
 - [配置要点](#配置项要点nanobotconfigjson)
@@ -31,7 +32,7 @@
 |------|------|
 | 终端 REPL / `-m` 单条消息 | ✅ |
 | 记忆：`MEMORY.md` + 按 session 持久化（`.nanobot-runtime/memory/`） | ✅ |
-| Kimi / OpenAI / OpenRouter 等兼容端点（OpenAI SDK） | ✅ |
+| Kimi / 智谱（zhipuai、bigmodel）/ OpenAI / OpenRouter 等兼容端点（OpenAI SDK） | ✅ |
 | 工具：`read_file` / `list_dir` / `search_repo` / `write_file`；可选 `run_shell` | ✅ |
 | 微信 iLink：扫码登录、长轮询、纯文本 ↔ Agent（无图片/语音 CDN 解密） | ✅ |
 | Web 管理台：概览、对话、**技能管理**（列表 / GitHub 导入）、模型与供应商、高级配置 | ✅ |
@@ -75,11 +76,18 @@ pnpm build
 MOONSHOT_API_KEY=sk-...
 ```
 
-也可写在 `nanobot.config.json` 的 `providers.<name>.apiKey`（**勿提交 Git**）。
+也可写在 `nanobot.config.json` 的 `providers.<name>.apiKey`（**该文件已列入 `.gitignore`，勿把含真实 Key 的副本提交到 Git**；仓库内只保留 `nanobot.config.json.example` 作结构参考）。
 
 ### 2. 配置文件
 
-默认读取根目录 `nanobot.config.json`（可用 `NANOBOT_CONFIG` 覆盖路径）。若无配置：
+默认读取根目录 `nanobot.config.json`（可用 `NANOBOT_CONFIG` 覆盖路径）。首次可：
+
+```bash
+cp nanobot.config.json.example nanobot.config.json
+# Windows: copy nanobot.config.json.example nanobot.config.json
+```
+
+再填写各 `providers.*.apiKey`（及必要时 `channels.weixin` 等）。若无配置也可：
 
 ```bash
 pnpm --filter nanobot start -- onboard
@@ -147,6 +155,15 @@ pnpm start:admin
 
 ---
 
+## 智谱 AI（zhipuai）
+
+- 在 `nanobot.config.json` 中设置 **`agents.defaults.provider`** 为 **`zhipuai`**（或沿用 id **`bigmodel`**，二者指向同一 [OpenAI 兼容](https://docs.bigmodel.cn/cn/guide/develop/openai/introduction) 端点）。
+- **`agents.defaults.model`** 使用控制台模型名，例如 **`glm-4-flash`**、**`glm-4-plus`** 等。
+- 若误填了带 **`/`** 的 OpenRouter 风格 id，运行时会回退为 **`glm-4-flash`** 并打日志提示。
+- 密钥：写在 **`providers.zhipuai.apiKey`**（或 **`providers.bigmodel.apiKey`**），或使用下表中的环境变量。
+
+---
+
 ## 环境变量摘要
 
 | 变量 | 作用 |
@@ -154,6 +171,7 @@ pnpm start:admin
 | `MOONSHOT_API_KEY` / `KIMI_API_KEY` | Moonshot |
 | `OPENAI_API_KEY` | OpenAI |
 | `OPENROUTER_API_KEY` | OpenRouter |
+| `ZHIPUAI_API_KEY` / `ZHIPU_API_KEY` / `BIGMODEL_API_KEY` | 智谱（`zhipuai` / `bigmodel` provider） |
 | `NANOBOT_CONFIG` | 配置文件路径 |
 | `NANOBOT_WORKSPACE` | 工具默认工作区 |
 | `NANOBOT_WEIXIN_VERBOSE` | `1` / `true` 时微信详细日志 |

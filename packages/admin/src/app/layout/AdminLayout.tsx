@@ -1,8 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router-dom";
 import { Layout, Menu, theme as antdTheme, Typography } from "antd";
 import { getAdminSiderMenuItems } from "@/app/nav/adminMenu";
-import { ADMIN_PAGE_TITLES, PATH_BY_MENU, menuKeyFromPath, type MenuKey } from "@/app/nav/paths";
+import {
+  ADMIN_PAGE_TITLES,
+  ADMIN_SUBMENU_MANAGE_KEY,
+  MENU_KEYS_UNDER_MANAGE,
+  menuKeyFromPath,
+  pathForMenuKey,
+} from "@/app/nav/paths";
 
 const { Header, Sider, Content } = Layout;
 
@@ -12,6 +18,16 @@ export function AdminLayout() {
   const navigate = useNavigate();
   const location = useLocation();
   const key = menuKeyFromPath(location.pathname);
+  const [openKeys, setOpenKeys] = useState<string[]>(() =>
+    MENU_KEYS_UNDER_MANAGE.includes(key) ? [ADMIN_SUBMENU_MANAGE_KEY] : [],
+  );
+
+  useEffect(() => {
+    const leaf = menuKeyFromPath(location.pathname);
+    if (MENU_KEYS_UNDER_MANAGE.includes(leaf)) {
+      setOpenKeys((prev) => (prev.includes(ADMIN_SUBMENU_MANAGE_KEY) ? prev : [...prev, ADMIN_SUBMENU_MANAGE_KEY]));
+    }
+  }, [location.pathname]);
 
   return (
     <Layout style={{ minHeight: "100vh" }}>
@@ -40,9 +56,12 @@ export function AdminLayout() {
           theme="dark"
           mode="inline"
           selectedKeys={[key]}
+          openKeys={openKeys}
+          onOpenChange={setOpenKeys}
           items={getAdminSiderMenuItems()}
           onClick={({ key: k }) => {
-            navigate(PATH_BY_MENU[k as MenuKey]);
+            const p = pathForMenuKey(k);
+            if (p) navigate(p);
           }}
         />
       </Sider>

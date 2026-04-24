@@ -205,6 +205,7 @@ function buildCoreSystemBlock(displayName: string): string {
 - git_status / git_diff：查看 Git 仓库状态和变更。
 - file_stats：分析项目文件统计（代码行数、文件类型分布）。
 - get_package_info：读取 package.json 了解项目配置和依赖。
+- 若 nanobot.config.json 配置了 mcp.servers（stdio），还会出现以 mcp__ 开头的工具，来自对应 MCP Server。
 
 回答尽量简短；需要时给出代码。若工具调用失败，说明原因并给出可行修复建议。
 

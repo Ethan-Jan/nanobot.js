@@ -7,6 +7,16 @@ const ENV_KEYS: Record<string, string[]> = {
   openrouter: ["OPENROUTER_API_KEY", "NANOBOT_OPENROUTER_API_KEY"],
   openai: ["OPENAI_API_KEY", "NANOBOT_OPENAI_API_KEY"],
   moonshot: ["MOONSHOT_API_KEY", "KIMI_API_KEY", "NANOBOT_MOONSHOT_API_KEY"],
+  /** 智谱 GLM OpenAI 兼容：https://docs.bigmodel.cn/cn/guide/develop/openai/introduction */
+  bigmodel: ["BIGMODEL_API_KEY", "ZHIPU_API_KEY", "NANOBOT_BIGMODEL_API_KEY"],
+  /** 与 bigmodel 同端点；额外支持 ZHIPUAI_* 命名 */
+  zhipuai: [
+    "ZHIPUAI_API_KEY",
+    "ZHIPU_API_KEY",
+    "BIGMODEL_API_KEY",
+    "NANOBOT_ZHIPUAI_API_KEY",
+    "NANOBOT_BIGMODEL_API_KEY",
+  ],
 };
 
 function apiKeyFromEnv(providerId: string): string | undefined {
@@ -45,7 +55,7 @@ function resolveCredentials(config: NanobotConfig): {
 
   if (!apiKey) {
     const path = configPath();
-    const tryIds = ["moonshot", "openai", "openrouter"].filter((id) => id !== name);
+    const tryIds = ["moonshot", "zhipuai", "bigmodel", "openai", "openrouter"].filter((id) => id !== name);
     for (const id of tryIds) {
       const k = apiKeyFromEnv(id);
       const p = config.providers[id];
@@ -83,6 +93,12 @@ export function effectiveChatModel(config: NanobotConfig, providerName: string):
       `[nanobot] Model "${m}" is not a Kimi id; using "kimi-k2.5" for this run. Set agents.defaults.model in ${configPath()}.`,
     );
     return "kimi-k2.5";
+  }
+  if ((providerName === "bigmodel" || providerName === "zhipuai") && m.includes("/")) {
+    console.error(
+      `[nanobot] Model "${m}" looks like an OpenRouter-style id; using "glm-4-flash" for Zhipu. Set agents.defaults.model in ${configPath()}.`,
+    );
+    return "glm-4-flash";
   }
   return m;
 }

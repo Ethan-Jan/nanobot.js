@@ -6,6 +6,14 @@ const ENV_FOR: Record<string, string[]> = {
   openrouter: ["OPENROUTER_API_KEY", "NANOBOT_OPENROUTER_API_KEY"],
   openai: ["OPENAI_API_KEY", "NANOBOT_OPENAI_API_KEY"],
   moonshot: ["MOONSHOT_API_KEY", "KIMI_API_KEY", "NANOBOT_MOONSHOT_API_KEY"],
+  bigmodel: ["BIGMODEL_API_KEY", "ZHIPU_API_KEY", "NANOBOT_BIGMODEL_API_KEY"],
+  zhipuai: [
+    "ZHIPUAI_API_KEY",
+    "ZHIPU_API_KEY",
+    "BIGMODEL_API_KEY",
+    "NANOBOT_ZHIPUAI_API_KEY",
+    "NANOBOT_BIGMODEL_API_KEY",
+  ],
 };
 
 function maskSecret(s: string | undefined): string {
