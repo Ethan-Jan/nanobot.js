@@ -242,6 +242,7 @@ pnpm --filter nanobot start -- -m "用一句话介绍本项目"
 | `pnpm nanobot` | 运行已构建 CLI |
 | `pnpm start:admin` / `pnpm start:api` | 运行已构建 Nest（`node dist/main.js`） |
 | `pnpm start:all` | `start:admin` + 微信长轮询重试 |
+| `pnpm run playwright:install` | 安装 Playwright 的 **Chromium**（`skills/browser-watch` 示例用；换机或首次跑 Playwright 脚本时执行） |
 
 ### `packages/nanobot`
 

@@ -15,13 +15,15 @@
     "start:api": "pnpm --filter @nanobot/api start",
     "start:all": "concurrently -n api,weixin -c blue,magenta \"pnpm --filter @nanobot/api start\" \"node scripts/weixin-retry.mjs\"",
     "nanobot": "pnpm --filter nanobot start",
-    "typecheck": "pnpm -r run typecheck"
+    "typecheck": "pnpm -r run typecheck",
+    "playwright:install": "playwright install chromium"
   },
   "engines": {
     "node": ">=20"
   },
   "packageManager": "pnpm@9.15.0",
   "devDependencies": {
-    "concurrently": "^9.1.0"
+    "concurrently": "^9.1.0",
+    "playwright": "^1.59.1"
   }
 }
