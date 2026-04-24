@@ -9,7 +9,8 @@ export function ChatPage() {
     hydrated,
     activeId,
     draft,
-    setDraft,
+    onDraftUserInput,
+    onDraftKeyDown,
     loading,
     turns,
     sortedThreads,
@@ -19,6 +20,7 @@ export function ChatPage() {
     removeThread,
     clearCurrentThread,
     sendMessage,
+    stopGeneration,
   } = useChatWorkspace();
 
   if (!hydrated || !activeId) {
@@ -29,7 +31,9 @@ export function ChatPage() {
     <div>
       <Typography.Paragraph type="secondary" style={{ marginTop: 0 }}>
         对话列表保存在本机浏览器（localStorage）。每条会话对应服务端记忆键 <code>admin:web:&lt;会话ID&gt;</code>，与 CLI
-        其它会话隔离。出于安全，此入口<strong>不会</strong>开启 <code>run_shell</code>。
+        其它会话隔离。出于安全，此入口<strong>不会</strong>开启 <code>run_shell</code>。生成过程中可点<strong>停止</strong>
+        或按 <kbd>Esc</kbd>。在输入框<strong>单行</strong>编辑时可用 <kbd>↑</kbd>
+        <kbd>↓</kbd> 快速调出本会话发过的内容。
       </Typography.Paragraph>
       <div
         style={{
@@ -51,10 +55,12 @@ export function ChatPage() {
           turns={turns}
           loading={loading}
           draft={draft}
-          onDraftChange={setDraft}
+          onDraftChange={onDraftUserInput}
+          onDraftKeyDown={onDraftKeyDown}
           onSend={sendMessage}
           onClearThread={clearCurrentThread}
           listEndRef={listEndRef}
+          onStop={stopGeneration}
         />
       </div>
     </div>

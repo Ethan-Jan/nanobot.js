@@ -1,3 +1,4 @@
+import type { KeyboardEvent } from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { App } from "antd";
 import { postChatStream, type ChatTurn } from "@/shared/api";
@@ -20,6 +21,10 @@ export function useChatWorkspace() {
   const [loading, setLoading] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const listEndRef = useRef<HTMLDivElement>(null);
+  const streamAbortRef = useRef<AbortController | null>(null);
+  /** `null` = 未浏览历史，正在自填；`number` = 正在查看 `userInputHistory[index]` */
+  const [inputHistoryIndex, setInputHistoryIndex] = useState<number | null>(null);
+  const stashedDraftRef = useRef("");
 
   useEffect(() => {
     let list = loadThreadsFromStorage();
@@ -54,6 +59,16 @@ export function useChatWorkspace() {
     [threads, activeId],
   );
   const turns = active?.turns ?? [];
+  /** 从当前对话轮次提取的用户消息，供输入框上下键复用；与 turns 同序、由旧到新 */
+  const userInputHistory = useMemo(
+    () => turns.filter((m) => m.role === "user").map((m) => m.content),
+    [turns],
+  );
+
+  useEffect(() => {
+    setInputHistoryIndex(null);
+    stashedDraftRef.current = "";
+  }, [activeId]);
 
   useEffect(() => {
     listEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -68,6 +83,7 @@ export function useChatWorkspace() {
     const next: ChatThread = { id, title: "新对话", updatedAt: Date.now(), turns: [] };
     setThreads((prev) => [next, ...prev]);
     setActiveId(id);
+    setInputHistoryIndex(null);
     setDraft("");
   }, []);
 
@@ -75,6 +91,7 @@ export function useChatWorkspace() {
     (id: string) => {
       if (loading) return;
       setActiveId(id);
+      setInputHistoryIndex(null);
       setDraft("");
     },
     [loading],
@@ -98,12 +115,14 @@ export function useChatWorkspace() {
       title: "新对话",
       updatedAt: Date.now(),
     }));
+    setInputHistoryIndex(null);
     setDraft("");
   }, [activeId, updateActiveThread]);
 
   const sendMessage = useCallback(async () => {
     const text = draft.trim();
     if (!text || loading || !activeId || !active) return;
+    setInputHistoryIndex(null);
     const nextMessages: ChatTurn[] = [...turns, { role: "user", content: text }];
     updateActiveThread((t) => ({
       ...t,
@@ -113,6 +132,7 @@ export function useChatWorkspace() {
     }));
     setDraft("");
     setLoading(true);
+    streamAbortRef.current = new AbortController();
     const withAssistant = [...nextMessages, { role: "assistant" as const, content: "" }];
     setThreads((prev) =>
       prev.map((t) =>
@@ -123,44 +143,114 @@ export function useChatWorkspace() {
     );
     let acc = "";
     try {
-      await postChatStream(nextMessages, activeId, (chunk) => {
-        acc += chunk;
+      await postChatStream(
+        nextMessages,
+        activeId,
+        (chunk) => {
+          acc += chunk;
+          setThreads((prev) =>
+            prev.map((t) => {
+              if (t.id !== activeId) return t;
+              const u = [...t.turns];
+              if (u.length === 0) return t;
+              u[u.length - 1] = { role: "assistant", content: acc };
+              return {
+                ...t,
+                turns: u,
+                title:
+                  t.title === "新对话" ? deriveThreadTitle([...nextMessages, { role: "assistant", content: acc }]) : t.title,
+                updatedAt: Date.now(),
+              };
+            }),
+          );
+        },
+        { signal: streamAbortRef.current.signal },
+      );
+    } catch (e) {
+      const aborted = e instanceof DOMException && e.name === "AbortError";
+      if (aborted) {
+        const note = acc.trim() ? `${acc}\n\n*[已停止生成]*` : "[已停止生成]";
         setThreads((prev) =>
           prev.map((t) => {
             if (t.id !== activeId) return t;
             const u = [...t.turns];
             if (u.length === 0) return t;
-            u[u.length - 1] = { role: "assistant", content: acc };
-            return {
-              ...t,
-              turns: u,
-              title:
-                t.title === "新对话" ? deriveThreadTitle([...nextMessages, { role: "assistant", content: acc }]) : t.title,
-              updatedAt: Date.now(),
-            };
+            u[u.length - 1] = { role: "assistant", content: note };
+            return { ...t, turns: u, updatedAt: Date.now() };
           }),
         );
-      });
-    } catch (e) {
-      message.error(e instanceof Error ? e.message : String(e));
-      setThreads((prev) =>
-        prev.map((t) => (t.id === activeId ? { ...t, turns: t.turns.slice(0, -2) } : t)),
-      );
+        messageRef.current.info("已停止生成。可用 ↑↓ 在输入框快速调出本会话发过的文字。");
+      } else {
+        message.error(e instanceof Error ? e.message : String(e));
+        setThreads((prev) =>
+          prev.map((t) => (t.id === activeId ? { ...t, turns: t.turns.slice(0, -2) } : t)),
+        );
+      }
     } finally {
+      streamAbortRef.current = null;
       setLoading(false);
     }
-  }, [draft, loading, activeId, active, turns, updateActiveThread, message]);
+  }, [draft, loading, activeId, active, turns, updateActiveThread]);
 
   const sortedThreads = useMemo(
     () => [...threads].sort((a, b) => b.updatedAt - a.updatedAt),
     [threads],
   );
 
+  const stopGeneration = useCallback(() => {
+    streamAbortRef.current?.abort();
+  }, []);
+
+  /** 用户编辑输入时退出历史浏览 */
+  const onDraftUserInput = useCallback((v: string) => {
+    setInputHistoryIndex(null);
+    setDraft(v);
+  }, []);
+
+  /**
+   * 输入框内 ↑↓ 快速遍历本会话已发送过的用户消息（单行编辑时；含换行时走默认光标行为）。
+   */
+  const onDraftKeyDown = useCallback(
+    (e: KeyboardEvent<HTMLTextAreaElement>) => {
+      if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+      if (e.shiftKey || e.metaKey || e.ctrlKey || e.altKey) return;
+      if (loading) return;
+      if (draft.includes("\n")) return;
+      if (userInputHistory.length === 0) return;
+
+      e.preventDefault();
+      if (e.key === "ArrowUp") {
+        if (inputHistoryIndex === null) {
+          stashedDraftRef.current = draft;
+          const idx = userInputHistory.length - 1;
+          setInputHistoryIndex(idx);
+          setDraft(userInputHistory[idx]!);
+          return;
+        }
+        const idx = Math.max(0, inputHistoryIndex - 1);
+        setInputHistoryIndex(idx);
+        setDraft(userInputHistory[idx]!);
+        return;
+      }
+      if (inputHistoryIndex === null) return;
+      if (inputHistoryIndex < userInputHistory.length - 1) {
+        const idx = inputHistoryIndex + 1;
+        setInputHistoryIndex(idx);
+        setDraft(userInputHistory[idx]!);
+        return;
+      }
+      setInputHistoryIndex(null);
+      setDraft(stashedDraftRef.current);
+    },
+    [draft, inputHistoryIndex, loading, userInputHistory],
+  );
+
   return {
     hydrated,
     activeId,
     draft,
-    setDraft,
+    onDraftUserInput,
+    onDraftKeyDown,
     loading,
     turns,
     sortedThreads,
@@ -170,5 +260,6 @@ export function useChatWorkspace() {
     removeThread,
     clearCurrentThread,
     sendMessage,
+    stopGeneration,
   };
 }

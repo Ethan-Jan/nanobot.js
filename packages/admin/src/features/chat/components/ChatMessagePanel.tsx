@@ -1,4 +1,4 @@
-import type { RefObject } from "react";
+import type { KeyboardEvent, RefObject } from "react";
 import { Button, Card, Input, Spin, Typography } from "antd";
 import type { ChatTurn } from "@/shared/api";
 
@@ -9,9 +9,11 @@ type Props = {
   loading: boolean;
   draft: string;
   onDraftChange: (v: string) => void;
+  onDraftKeyDown: (e: KeyboardEvent<HTMLTextAreaElement>) => void;
   onSend: () => void;
   onClearThread: () => void;
   listEndRef: RefObject<HTMLDivElement | null>;
+  onStop: () => void;
 };
 
 export function ChatMessagePanel({
@@ -22,6 +24,8 @@ export function ChatMessagePanel({
   onSend,
   onClearThread,
   listEndRef,
+  onStop,
+  onDraftKeyDown,
 }: Props) {
   return (
     <Card
@@ -80,10 +84,17 @@ export function ChatMessagePanel({
       <TextArea
         value={draft}
         onChange={(e) => onDraftChange(e.target.value)}
-        placeholder="Enter 发送，Shift+Enter 换行"
+        placeholder="Enter 发送，Shift+Enter 换行；单行时 ↑↓ 浏览本会话发过的内容；生成中 Esc 可停止"
         autoSize={{ minRows: 2, maxRows: 6 }}
         onKeyDown={(e) => {
+          if (e.key === "Escape" && loading) {
+            e.preventDefault();
+            onStop();
+            return;
+          }
+          onDraftKeyDown(e);
           if (e.key !== "Enter" || e.shiftKey) return;
+          if (e.defaultPrevented) return;
           if (e.nativeEvent.isComposing) return;
           e.preventDefault();
           void onSend();
@@ -91,10 +102,24 @@ export function ChatMessagePanel({
         disabled={loading}
       />
       <div style={{ marginTop: 8, display: "flex", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-        <Button onClick={onClearThread}>清空当前会话</Button>
-        <Button type="primary" onClick={() => void onSend()} loading={loading} disabled={!draft.trim()}>
-          发送
-        </Button>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+          <Button onClick={onClearThread}>清空当前会话</Button>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          {loading ? (
+            <Button danger onClick={onStop}>
+              停止生成
+            </Button>
+          ) : null}
+          <Button
+            type="primary"
+            onClick={() => void onSend()}
+            loading={loading}
+            disabled={loading || !draft.trim()}
+          >
+            发送
+          </Button>
+        </div>
       </div>
     </Card>
   );
