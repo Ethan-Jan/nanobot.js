@@ -108,6 +108,44 @@ function accToToolCallArray(acc: Map<number, ToolCallAcc>): OpenAI.Chat.ChatComp
     }));
 }
 
+type AssistantWithReasoning = OpenAI.Chat.ChatCompletionAssistantMessageParam & {
+  reasoning_content?: string;
+};
+
+/**
+ * Kimi / Moonshot：开启 thinking 时，多轮 tools 的 assistant 须带回 reasoning_content；流式里需自行拼上。
+ * 有增量则原样使用；无则回退为单空格，避免 400（与部分客户端 / Kimi 文档约定一致）。
+ */
+function pushAssistantWithToolCallsMoonshot(
+  messages: OpenAI.Chat.ChatCompletionMessageParam[],
+  content: string | null,
+  toolCalls: OpenAI.Chat.ChatCompletionMessageToolCall[],
+  reasoningBuf: string,
+): void {
+  const msg: AssistantWithReasoning = {
+    role: "assistant",
+    content,
+    tool_calls: toolCalls,
+    reasoning_content: reasoningBuf.trim() ? reasoningBuf : " ",
+  };
+  messages.push(msg);
+}
+
+/**
+ * 未设环境变量时**不传** `thinking`，由接口默认；设为 enabled/disabled 时显式覆盖。
+ * `NANOBOT_MOONSHOT_THINKING`：`0|off|false|disabled` / `1|on|true|enabled` / 空=默认
+ */
+function moonshotRequestExtras(): Record<string, unknown> {
+  const v = process.env.NANOBOT_MOONSHOT_THINKING?.trim().toLowerCase();
+  if (v === "0" || v === "off" || v === "false" || v === "disabled") {
+    return { thinking: { type: "disabled" as const } };
+  }
+  if (v === "1" || v === "on" || v === "true" || v === "enabled") {
+    return { thinking: { type: "enabled" as const } };
+  }
+  return {};
+}
+
 /**
  * 执行一轮「模型 + 工具」循环，直到模型不再调用工具或达到轮数上限。
  * 与上游 AgentLoop 的核心相似，但无 memory / channel / hook 等外围逻辑。
@@ -128,18 +166,25 @@ async function runModelToolRounds(
     /** Kimi 部分模型（如 kimi-k2.5）仅允许 temperature=1，否则 400 */
     const temperature = diag.providerName === "moonshot" ? 1 : 0.2;
 
-    const baseParams = {
+    const baseParams: OpenAI.Chat.ChatCompletionCreateParams = {
       model,
       messages,
       tools: tools.length ? tools : undefined,
       tool_choice: tools.length ? "auto" as const : undefined,
       temperature,
     };
+    const requestParams =
+      diag.providerName === "moonshot"
+        ? ({ ...baseParams, ...moonshotRequestExtras() } as OpenAI.ChatCompletionCreateParams)
+        : (baseParams as OpenAI.ChatCompletionCreateParams);
 
     if (useStream) {
       let stream: AsyncIterable<OpenAI.Chat.ChatCompletionChunk>;
       try {
-        stream = (await client.chat.completions.create({ ...baseParams, stream: true })) as AsyncIterable<OpenAI.Chat.ChatCompletionChunk>;
+        stream = (await client.chat.completions.create({
+          ...requestParams,
+          stream: true,
+        })) as AsyncIterable<OpenAI.Chat.ChatCompletionChunk>;
       } catch (e) {
         onAssistantText(
           "\n" +
@@ -155,8 +200,13 @@ async function runModelToolRounds(
       }
       const acc: Map<number, ToolCallAcc> = new Map();
       let textBuf = "";
+      let reasoningBuf = "";
       for await (const chunk of stream) {
         const delta = chunk.choices[0]?.delta;
+        if (delta) {
+          const ext = delta as { reasoning_content?: string | null };
+          if (ext.reasoning_content) reasoningBuf += ext.reasoning_content;
+        }
         if (delta?.content) {
           textBuf += delta.content;
           onAssistantText(delta.content);
@@ -165,7 +215,17 @@ async function runModelToolRounds(
       }
       const toolCalls = accToToolCallArray(acc);
       if (toolCalls.length) {
-        messages.push({ role: "assistant", content: textBuf || null, tool_calls: toolCalls });
+        if (diag.providerName === "moonshot") {
+          pushAssistantWithToolCallsMoonshot(messages, textBuf || null, toolCalls, reasoningBuf);
+        } else {
+          const m: AssistantWithReasoning = {
+            role: "assistant",
+            content: textBuf || null,
+            tool_calls: toolCalls,
+          };
+          if (reasoningBuf.trim()) m.reasoning_content = reasoningBuf;
+          messages.push(m);
+        }
         for (const call of toolCalls) {
           if (call.type !== "function") continue;
           const fn = call.function;
@@ -191,7 +251,10 @@ async function runModelToolRounds(
 
     let completion: OpenAI.Chat.ChatCompletion;
     try {
-      completion = await client.chat.completions.create(baseParams);
+      completion = (await client.chat.completions.create({
+        ...requestParams,
+        stream: false,
+      })) as OpenAI.Chat.ChatCompletion;
     } catch (e) {
       onAssistantText(
         "\n" +
@@ -214,7 +277,13 @@ async function runModelToolRounds(
     }
 
     const msg = choice.message;
-    messages.push(msg);
+    messages.push(msg as OpenAI.Chat.ChatCompletionMessageParam);
+    if (diag.providerName === "moonshot" && msg.tool_calls?.length) {
+      const last = messages[messages.length - 1] as AssistantWithReasoning;
+      if (last.role === "assistant" && !String(last.reasoning_content ?? "").trim()) {
+        last.reasoning_content = " ";
+      }
+    }
 
     const calls = msg.tool_calls;
     if (!calls?.length) {
